@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Laya — Party Jukebox</title>
+  <style>
+    :root {
+      --bg: #000000;
+      --glass: rgba(28, 28, 38, 0.75);
+      --glass-border: rgba(255, 255, 255, 0.12);
+      --accent: #ff2a6d;
+      --accent-glow: rgba(255, 42, 109, 0.5);
+      --text: #ffffff;
+      --sub: rgba(255, 255, 255, 0.65);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      padding: 16px;
+    }
+    .ambient-glow {
+      position: fixed;
+      inset: -30%;
+      background: radial-gradient(circle at 50% 20%, rgba(255, 42, 109, 0.25), transparent 60%);
+      filter: blur(80px);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .container {
+      position: relative;
+      z-index: 10;
+      max-width: 480px;
+      margin: 0 auto;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .top-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: var(--glass);
+      backdrop-filter: blur(40px) saturate(180%);
+      -webkit-backdrop-filter: blur(40px) saturate(180%);
+      border: 1px solid var(--glass-border);
+      border-radius: 24px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .pill { width: 4px; height: 16px; background: #fff; border-radius: 2px; transform: rotate(25deg); }
+    .pill.short { height: 10px; background: var(--accent); }
+    .brand-title { font-weight: 800; font-size: 18px; }
+    .room-badge {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent);
+      background: rgba(255, 42, 109, 0.15);
+      border: 1px solid var(--accent);
+      padding: 4px 10px;
+      border-radius: 12px;
+    }
+    .search-box {
+      display: flex;
+      align-items: center;
+      background: var(--glass);
+      backdrop-filter: blur(40px);
+      -webkit-backdrop-filter: blur(40px);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+      padding: 12px 18px;
+      gap: 12px;
+    }
+    .search-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-size: 16px;
+      outline: none;
+    }
+    .search-input::placeholder { color: var(--sub); }
+    .track-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .track-card {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 16px;
+      background: var(--glass);
+      backdrop-filter: blur(40px);
+      -webkit-backdrop-filter: blur(40px);
+      border: 1px solid var(--glass-border);
+      border-radius: 18px;
+      transition: all 0.2s;
+    }
+    .track-art {
+      width: 52px;
+      height: 52px;
+      border-radius: 12px;
+      object-fit: cover;
+      background: #181824;
+    }
+    .track-info { flex: 1; min-width: 0; }
+    .track-name { font-size: 16px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .track-artist { font-size: 13px; color: var(--sub); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .add-btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 14px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      box-shadow: 0 4px 14px var(--accent-glow);
+      transition: transform 0.15s;
+    }
+    .add-btn:active { transform: scale(0.92); }
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: rgba(30, 30, 42, 0.95);
+      border: 1px solid var(--accent);
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 20px;
+      font-weight: 700;
+      font-size: 14px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 100;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+  <div class="ambient-glow"></div>
+  <div class="container">
+    <header class="top-header">
+      <div class="brand">
+        <div class="pill short"></div>
+        <div class="pill"></div>
+        <span class="brand-title">Laya Party</span>
+      </div>
+      <div class="room-badge" id="room-code-tag">ROOM: LAYA-TV</div>
+    </header>
+
+    <div class="search-box">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="rgba(255,255,255,0.7)"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+      <input type="text" id="phone-search" class="search-input" placeholder="Search song or artist..." autocomplete="off">
+    </div>
+
+    <div class="track-list" id="phone-results"></div>
+  </div>
+
+  <div id="phone-toast" class="toast">Added to TV queue! 🎶</div>
+
+  <script>
+    const sampleCatalog = [
+      { id: 'curated_espresso', title: 'Espresso', artist: 'Sabrina Carpenter', artwork: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80', durationFormatted: '2:55' },
+      { id: 'party_1', title: 'Blinding Lights', artist: 'The Weeknd', artwork: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&auto=format&fit=crop&q=80', durationFormatted: '3:20' },
+      { id: 'party_2', title: 'Levitating', artist: 'Dua Lipa', artwork: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&auto=format&fit=crop&q=80', durationFormatted: '3:23' },
+      { id: 'party_3', title: 'Starboy', artist: 'The Weeknd ft. Daft Punk', artwork: 'https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?w=600&auto=format&fit=crop&q=80', durationFormatted: '3:50' },
+      { id: 'party_4', title: 'Cruel Summer', artist: 'Taylor Swift', artwork: 'https://images.unsplash.com/photo-1445985543469-221e57446c70?w=600&auto=format&fit=crop&q=80', durationFormatted: '2:58' },
+      { id: 'party_5', title: 'As It Was', artist: 'Harry Styles', artwork: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=600&auto=format&fit=crop&q=80', durationFormatted: '2:47' }
+    ];
+
+    const channel = new BroadcastChannel('laya_party_jukebox');
+    const roomParam = new URLSearchParams(window.location.search).get('room') || 'LAYA-TV';
+    document.getElementById('room-code-tag').textContent = `ROOM: ${roomParam}`;
+
+    function renderList(items) {
+      const listEl = document.getElementById('phone-results');
+      listEl.innerHTML = '';
+      items.forEach(track => {
+        const card = document.createElement('div');
+        card.className = 'track-card';
+        card.innerHTML = `
+          <img class="track-art" src="${track.artwork}" alt="">
+          <div class="track-info">
+            <div class="track-name">${track.title}</div>
+            <div class="track-artist">${track.artist}</div>
+          </div>
+          <button class="add-btn" onclick='queueTrack(${JSON.stringify(track)})'>+ Queue</button>
+        `;
+        listEl.appendChild(card);
+      });
+    }
+
+    window.queueTrack = function(track) {
+      // Broadcast to TV
+      channel.postMessage({ type: 'ADD_GUEST_TRACK', track: track, room: roomParam });
+      // Also write to shared localStorage for TV
+      try {
+        localStorage.setItem('laya_guest_incoming_track', JSON.stringify({ track, time: Date.now() }));
+      } catch(e){}
+
+      showToast(`Added "${track.title}" to TV queue! 🎉`);
+    };
+
+    function showToast(msg) {
+      const t = document.getElementById('phone-toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2500);
+    }
+
+    const input = document.getElementById('phone-search');
+    input.addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase().trim();
+      if (!q) { renderList(sampleCatalog); return; }
+      const filtered = sampleCatalog.filter(t => t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q));
+      renderList(filtered);
+    });
+
+    renderList(sampleCatalog);
+  </script>
+</body>
+</html>

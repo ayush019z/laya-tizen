@@ -1,0 +1,1493 @@
+/* =====================================================================
+   LAYA TV — Exact Laya Frosted-Glass & Liquid Ambient UI
+   Replicating the Authentic Laya Mobile & 10-Foot TV Experience
+   ===================================================================== */
+
+:root {
+  --bg-oled: #000000;
+  --bg-surface: #101014;
+  --glass-capsule: rgba(22, 22, 30, 0.92);
+  --glass-capsule-hover: rgba(35, 35, 48, 0.96);
+  --glass-border: rgba(255, 255, 255, 0.15);
+  --glass-specular: rgba(255, 255, 255, 0.1);
+  --glass-blur: none;
+  
+  --dynamic-accent: #ff2a6d;
+  --dynamic-glow: rgba(255, 42, 109, 0.5);
+  --text-main: #ffffff;
+  --text-sub: rgba(255, 255, 255, 0.65);
+  --text-dim: rgba(255, 255, 255, 0.35);
+  
+  --font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+html, body {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--bg-oled);
+  color: var(--text-main);
+  font-family: var(--font-family);
+  font-size: 18px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* OLED Ambient Radial Gradient Background (Zero GPU Overhead for TV 60fps) */
+#liquid-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(circle at 18% 20%, rgba(70, 40, 130, 0.32) 0%, transparent 55%),
+              radial-gradient(circle at 82% 80%, rgba(140, 35, 70, 0.22) 0%, transparent 55%),
+              #000000;
+}
+
+.liquid-orb-1,
+.liquid-orb-2 {
+  display: none !important;
+}
+
+@keyframes floatOrb {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(4vw, 5vh) scale(1.1); }
+  100% { transform: translate(-3vw, 3vh) scale(0.95); }
+}
+
+/* App Master Shell */
+#app {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+}
+
+/* =====================================================================
+   TOP BAR (Circular Back Button, Logo, Profile Avatar)
+   ===================================================================== */
+#top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 50px 10px 50px;
+  z-index: 50;
+}
+
+.circle-nav-btn {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--glass-border);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.circle-nav-btn svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
+.circle-nav-btn:focus,
+.circle-nav-btn.focused {
+  background: #ffffff !important;
+  color: #000000 !important;
+  transform: scale(1.15) !important;
+  box-shadow: 0 0 24px rgba(255, 255, 255, 0.7) !important;
+}
+
+.circle-nav-btn:focus svg,
+.circle-nav-btn.focused svg {
+  fill: #000000 !important;
+}
+
+.laya-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.laya-brand-pills {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.laya-brand-pill {
+  width: 6px;
+  height: 22px;
+  background: #ffffff;
+  border-radius: 4px;
+  transform: rotate(25deg);
+}
+
+.laya-brand-pill.short {
+  height: 14px;
+  background: linear-gradient(180deg, #ffffff, var(--dynamic-accent));
+}
+
+.laya-brand-text {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: #ffffff;
+}
+
+.profile-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  background: #252535;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-avatar:focus {
+  border-color: #ffffff;
+  transform: scale(1.15);
+  box-shadow: 0 0 20px var(--dynamic-glow);
+}
+
+/* =====================================================================
+   MAIN VIEWPORT
+   ===================================================================== */
+#main-viewport {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 10px 60px 170px 60px;
+  scrollbar-width: none;
+}
+
+#main-viewport::-webkit-scrollbar {
+  display: none;
+}
+
+.view-screen {
+  display: none;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.view-screen.active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* =====================================================================
+   HOME CAROUSELS & DISCOVERY SHELVES
+   ===================================================================== */
+.shelf {
+  margin-bottom: 38px;
+}
+
+.shelf-title {
+  font-size: 24px;
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 16px;
+  letter-spacing: -0.3px;
+}
+
+.shelf-track-container {
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  padding: 8px 4px 20px 4px;
+  scrollbar-width: none;
+}
+
+.shelf-track-container::-webkit-scrollbar {
+  display: none;
+}
+
+.media-card {
+  flex: 0 0 195px;
+  width: 195px;
+  background: rgba(26, 26, 38, 0.9);
+  border-radius: 20px;
+  padding: 14px;
+  border: 1.5px solid var(--glass-border);
+  cursor: pointer;
+  outline: none;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  text-align: left;
+}
+
+.media-card:focus,
+.media-card.focused {
+  transform: scale(1.08) !important;
+  background: rgba(255, 255, 255, 0.16) !important;
+  border-color: #ffffff !important;
+  outline: 3px solid #ffffff !important;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.8), 0 0 28px var(--dynamic-glow) !important;
+}
+
+.media-card-artwork {
+  width: 100%;
+  aspect-ratio: 1/1;
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 12px;
+  background: #181824;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+}
+
+.media-card-artwork img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.media-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+}
+
+.media-card-author {
+  font-size: 13px;
+  color: var(--text-sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.screen-header {
+  margin-bottom: 24px;
+}
+
+.screen-title {
+  font-size: 32px;
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 6px;
+}
+
+.screen-subtitle {
+  font-size: 16px;
+  color: var(--text-sub);
+}
+
+/* Recognized Songs Section */
+.recognized-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 620px;
+  margin-bottom: 16px;
+}
+
+.recognized-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.recognized-clear-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+}
+
+.recognized-clear-btn:focus {
+  color: #ffffff;
+  text-decoration: underline;
+}
+
+/* Recognized Track Row */
+.recognized-track-row {
+  width: 100%;
+  max-width: 620px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+  margin-bottom: 10px;
+}
+
+.recognized-artwork {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #1c1c28;
+  flex-shrink: 0;
+}
+
+.recognized-artwork img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.recognized-info {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.recognized-track-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recognized-track-sub {
+  font-size: 14px;
+  color: var(--text-sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recognized-track-row:focus,
+.recognized-track-row.focused {
+  background: rgba(255, 255, 255, 0.16) !important;
+  border-color: #ffffff !important;
+  transform: scale(1.03) !important;
+  box-shadow: 0 0 24px rgba(255, 255, 255, 0.4) !important;
+}
+
+/* =====================================================================
+   TV ON-SCREEN KEYBOARD (YouTube TV Style - Crisp Remote Focus Highlights)
+   ===================================================================== */
+.tv-keyboard-wrapper {
+  background: rgba(22, 22, 32, 0.75);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-radius: 24px;
+  padding: 20px;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), inset 0 1px 1px var(--glass-specular);
+  margin-bottom: 28px;
+}
+
+#tv-keyboard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+
+.tv-keyboard-row {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.key-btn {
+  height: 52px;
+  min-width: 52px;
+  padding: 0 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 2px solid transparent;
+  color: #e5e5e5;
+  font-size: 19px;
+  font-weight: 700;
+  cursor: pointer;
+  outline: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+.key-btn:hover,
+.key-btn:focus,
+.key-btn.focused {
+  background: #ffffff !important;
+  color: #000000 !important;
+  border-color: #ffffff !important;
+  transform: scale(1.18) !important;
+  font-weight: 900 !important;
+  box-shadow: 0 0 24px rgba(255, 255, 255, 0.9), 0 8px 24px rgba(0, 0, 0, 0.7) !important;
+  z-index: 10 !important;
+}
+
+.key-btn:active {
+  transform: scale(0.96) !important;
+}
+
+.key-btn-space {
+  min-width: 240px;
+  font-size: 15px;
+  letter-spacing: 1px;
+}
+
+.key-btn-action {
+  min-width: 100px;
+  font-size: 15px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.key-btn-search {
+  min-width: 150px;
+  background: var(--dynamic-accent);
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.key-btn-search:hover,
+.key-btn-search:focus,
+.key-btn-search.focused {
+  background: #ffffff !important;
+  color: #000000 !important;
+}
+
+/* =====================================================================
+   BOTTOM FLOATING CAPSULES (Exact Laya Glass Pills)
+   ===================================================================== */
+#floating-bottom-dock {
+  position: fixed;
+  bottom: 24px;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  z-index: 100;
+  pointer-events: none;
+}
+
+#floating-bottom-dock > * {
+  pointer-events: auto;
+}
+
+/* 1. Floating Mini-Player Pill */
+.laya-mini-capsule {
+  width: 640px;
+  height: 70px;
+  background: var(--glass-capsule);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-radius: 35px;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), inset 0 1px 1px var(--glass-specular);
+  display: flex;
+  align-items: center;
+  padding: 0 20px 0 10px;
+  gap: 16px;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Glowing Artwork Bloom on Left */
+.mini-art-bloom {
+  position: absolute;
+  left: -10px;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--dynamic-accent) 0%, transparent 70%);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.mini-capsule-art {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #181824;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.mini-capsule-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mini-capsule-info {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  z-index: 2;
+}
+
+.mini-capsule-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mini-capsule-artist {
+  font-size: 13px;
+  color: var(--text-sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mini-capsule-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 2;
+}
+
+.mini-control-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: transparent;
+  border: 1.5px solid transparent;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.mini-control-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.mini-control-btn:focus,
+.mini-control-btn.focused {
+  background: rgba(255, 255, 255, 0.3) !important;
+  border-color: #ffffff !important;
+  transform: scale(1.18) !important;
+}
+
+.laya-mini-capsule:focus,
+.laya-mini-capsule.focused {
+  border-color: #ffffff !important;
+  transform: translateY(-4px) scale(1.02) !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 24px var(--dynamic-glow) !important;
+}
+
+/* 2. Floating Bottom Navigation Capsule + Circular Search Pill */
+.bottom-nav-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.laya-nav-capsule {
+  height: 64px;
+  background: var(--glass-capsule);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-radius: 32px;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), inset 0 1px 1px var(--glass-specular);
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  gap: 6px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Left ambient color bleed inside the pill */
+.nav-capsule-bloom {
+  position: absolute;
+  left: -20px;
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(230, 80, 80, 0.35) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.nav-tab-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 22px;
+  border-radius: 24px;
+  background: transparent;
+  border: 2px solid transparent;
+  color: var(--text-dim);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  z-index: 2;
+}
+
+.nav-tab-pill svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.nav-tab-pill.active {
+  color: #ffffff;
+}
+
+.nav-tab-pill:focus,
+.nav-tab-pill.focused {
+  background: rgba(255, 255, 255, 0.22) !important;
+  color: #ffffff !important;
+  border-color: #ffffff !important;
+  transform: scale(1.1) !important;
+  box-shadow: 0 0 22px rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Circular Floating Search Button */
+.search-circle-pill {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--glass-capsule);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), inset 0 1px 1px var(--glass-specular);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  z-index: 2;
+}
+
+.search-circle-pill svg {
+  width: 24px;
+  height: 24px;
+  fill: var(--text-dim);
+  transition: fill 0.2s ease;
+}
+
+.search-circle-pill:focus,
+.search-circle-pill.focused {
+  background: rgba(255, 255, 255, 0.25) !important;
+  border-color: #ffffff !important;
+  transform: scale(1.15) !important;
+  box-shadow: 0 0 24px rgba(255, 255, 255, 0.6) !important;
+}
+
+.search-circle-pill:focus svg,
+.search-circle-pill.focused svg {
+  fill: #ffffff !important;
+}
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.22s ease;
+}
+
+.search-circle-pill svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
+.search-circle-pill:focus {
+  background: var(--dynamic-accent);
+  border-color: #ffffff;
+  transform: scale(1.15);
+  box-shadow: 0 0 24px var(--dynamic-glow);
+}
+
+/* =====================================================================
+   NOW PLAYING & WORD-SYNCED LYRICS (Exact Screenshot #1)
+   ===================================================================== */
+#fullscreen-player {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 200;
+  display: none;
+  background: #060609;
+  overflow: hidden;
+}
+
+#fullscreen-player.active {
+  display: flex;
+}
+
+.player-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  filter: none !important;
+  -webkit-filter: none !important;
+  opacity: 0.16;
+  transform: none;
+  transition: background-image 0.8s ease;
+  z-index: 1;
+}
+
+.player-body {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  padding: 40px 60px;
+  gap: 60px;
+}
+
+/* Left Hero */
+.player-hero-column {
+  flex: 0 0 450px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.player-art-frame {
+  width: 410px;
+  height: 410px;
+  border-radius: 36px;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.85);
+  margin-bottom: 28px;
+  background: #151522;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.player-art-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.player-header-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.player-track-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.track-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.explicit-tag {
+  font-size: 11px;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  padding: 2px 6px;
+  border-radius: 5px;
+}
+
+.player-title-text {
+  font-size: 32px;
+  font-weight: 800;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-artist-text {
+  font-size: 20px;
+  color: var(--dynamic-accent);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-action-icons {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.icon-action-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1.5px solid transparent;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.icon-action-btn svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+}
+
+.icon-action-btn:focus {
+  background: #ffffff;
+  color: #000000;
+  border-color: #ffffff;
+  transform: scale(1.15);
+}
+
+.icon-action-btn:focus svg {
+  fill: #000000;
+}
+
+/* Scrubber */
+.player-scrubber {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 26px;
+}
+
+.scrubber-track {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+  position: relative;
+  cursor: pointer;
+  outline: none;
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.scrubber-track:focus {
+  border-color: #ffffff;
+  box-shadow: 0 0 20px var(--dynamic-glow);
+  transform: scaleY(1.5);
+}
+
+.scrubber-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #ffffff, var(--dynamic-accent));
+  border-radius: 4px;
+}
+
+.scrubber-times {
+  display: flex;
+  justify-content: space-between;
+  font-size: 15px;
+  color: var(--text-sub);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* Media Controls Row */
+.player-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.remote-btn {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 2px solid transparent;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.remote-btn.play-pause-btn {
+  width: 78px;
+  height: 78px;
+  background: #ffffff;
+  color: #000000;
+  box-shadow: 0 10px 30px rgba(255, 255, 255, 0.4);
+}
+
+.remote-btn svg {
+  width: 26px;
+  height: 26px;
+  fill: currentColor;
+}
+
+.remote-btn.play-pause-btn svg {
+  width: 36px;
+  height: 36px;
+  fill: #000000;
+}
+
+.remote-btn:focus {
+  background: var(--dynamic-accent);
+  color: #ffffff;
+  border-color: #ffffff;
+  transform: scale(1.15);
+  box-shadow: 0 0 26px var(--dynamic-glow);
+}
+
+.remote-btn:focus svg {
+  fill: #ffffff;
+}
+
+/* Right Lyrics Column (am-lyrics Apple Music style) */
+.player-side-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: rgba(18, 18, 26, 0.72);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-radius: 40px;
+  border: 1px solid var(--glass-border);
+  padding: 36px 48px;
+  overflow: hidden;
+  position: relative;
+}
+
+.lyrics-stage {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: none;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding: 80px 0 240px 0;
+}
+
+.lyrics-stage::-webkit-scrollbar {
+  display: none;
+}
+
+/* Inactive lyrics clean contrast */
+.lrc-line {
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.35);
+  transform: scale(0.98);
+  transform-origin: left center;
+  transition: transform 0.25s ease, color 0.25s ease;
+  cursor: pointer;
+  outline: none;
+}
+
+/* Active line focused */
+.lrc-line.active {
+  font-size: 40px;
+  font-weight: 800;
+  color: #ffffff;
+  transform: scale(1.02) translateX(6px);
+}
+
+/* Syllable word sweep */
+.lrc-word {
+  display: inline-block;
+  color: rgba(255, 255, 255, 0.35);
+  transition: color 0.25s ease, transform 0.25s ease, text-shadow 0.25s ease;
+  margin-right: 0.26em;
+}
+
+.lrc-line.active .lrc-word.sung {
+  color: #ffffff;
+  text-shadow: 0 0 16px rgba(255, 255, 255, 0.7);
+}
+
+.lrc-line.active .lrc-word.singing {
+  color: #ffffff;
+  transform: scale(1.08);
+  text-shadow: 0 0 24px var(--dynamic-glow);
+}
+
+/* Toast */
+#toast {
+  position: fixed;
+  top: 36px;
+  right: 48px;
+  background: rgba(24, 24, 34, 0.88);
+  backdrop-filter: var(--glass-blur);
+  border: 2px solid var(--dynamic-accent);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 24px var(--dynamic-glow);
+  color: #ffffff;
+  padding: 16px 26px;
+  border-radius: 20px;
+  font-size: 19px;
+  font-weight: 700;
+  z-index: 999;
+  display: none;
+  animation: slideInToast 0.25s ease-out;
+}
+
+@keyframes slideInToast {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* =====================================================================
+   FEATURE 1: PARTY JUKEBOX (FROSTED GLASS QR QUEUE)
+   ===================================================================== */
+.party-pill-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 24px;
+  background: rgba(255, 42, 109, 0.16);
+  border: 1.5px solid var(--dynamic-accent);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  outline: none;
+  box-shadow: 0 4px 18px rgba(255, 42, 109, 0.25);
+  transition: all 0.2s ease;
+}
+
+.party-pill-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: var(--dynamic-accent);
+}
+
+.party-pill-btn:focus {
+  background: var(--dynamic-accent);
+  transform: scale(1.08);
+  box-shadow: 0 0 24px var(--dynamic-glow);
+}
+
+.party-pill-btn:focus svg {
+  fill: #ffffff;
+}
+
+#party-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 500;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+#party-modal.active {
+  display: flex !important;
+  animation: modalFadeIn 0.2s ease-out;
+}
+
+.party-panel {
+  width: 1050px;
+  max-width: 90vw;
+  background: rgba(18, 18, 26, 0.98);
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  border-radius: 36px;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.95), 0 0 50px rgba(255, 42, 109, 0.25);
+  padding: 40px 48px;
+}
+
+.party-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  padding-bottom: 22px;
+}
+
+.brand-inline {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.room-code-pill {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--dynamic-accent);
+  background: rgba(255, 42, 109, 0.18);
+  border: 1px solid var(--dynamic-accent);
+  padding: 6px 14px;
+  border-radius: 14px;
+  letter-spacing: 1px;
+}
+
+.party-modal-body {
+  display: flex;
+  gap: 60px;
+  align-items: center;
+  padding-top: 36px;
+}
+
+.party-qr-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  flex: 0 0 300px;
+}
+
+.qr-code-box {
+  width: 260px;
+  height: 260px;
+  border-radius: 24px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(255, 255, 255, 0.3);
+  margin-bottom: 18px;
+}
+
+.qr-code-box svg {
+  width: 100%;
+  height: 100%;
+}
+
+.qr-scan-label {
+  font-size: 17px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 6px;
+}
+
+.qr-url-sub {
+  font-size: 13px;
+  color: var(--text-dim);
+  font-family: monospace;
+}
+
+.party-info-container {
+  flex: 1;
+}
+
+.party-perks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.party-perk-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 14px 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.perk-icon {
+  font-size: 24px;
+}
+
+.perk-desc {
+  font-size: 15px;
+  color: var(--text-sub);
+}
+
+.perk-desc strong {
+  color: #ffffff;
+}
+
+/* =====================================================================
+   FEATURE 2: CINEMA SCREENSAVER MODE
+   ===================================================================== */
+.screensaver-floating-pill {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(20, 20, 28, 0.88);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 8px 22px;
+  border-radius: 20px;
+  color: var(--text-dim);
+  font-size: 14px;
+  font-weight: 600;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1s ease;
+  z-index: 100;
+}
+
+#fullscreen-player.cinema-screensaver .screensaver-floating-pill {
+  opacity: 0.6;
+}
+
+#fullscreen-player.cinema-screensaver .player-header-card,
+#fullscreen-player.cinema-screensaver .player-scrubber,
+#fullscreen-player.cinema-screensaver .player-controls-row,
+#fullscreen-player.cinema-screensaver .player-action-icons {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(20px);
+  transition: all 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#fullscreen-player.cinema-screensaver .player-art-frame {
+  transform: scale(1.08) translateY(-10px);
+  box-shadow: 0 40px 100px rgba(0, 0, 0, 0.98), 0 0 90px var(--dynamic-glow);
+  transition: all 1.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#fullscreen-player.cinema-screensaver .lyrics-stage {
+  font-size: 1.15em;
+  transform: scale(1.03);
+  transition: all 1.2s ease;
+}
+
+/* =====================================================================
+   FEATURE 3: FULL-SCREEN KARAOKE PARTY STAGE
+   ===================================================================== */
+.karaoke-banner-pill {
+  position: absolute;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: none;
+  align-items: center;
+  gap: 14px;
+  background: rgba(25, 25, 36, 0.85);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1.5px solid #4ade80;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8), 0 0 30px rgba(74, 222, 128, 0.35);
+  padding: 10px 24px;
+  border-radius: 28px;
+  z-index: 100;
+  animation: fadeIn 0.3s ease;
+}
+
+#fullscreen-player.karaoke-stage-active .karaoke-banner-pill {
+  display: flex;
+}
+
+.karaoke-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #4ade80;
+  box-shadow: 0 0 12px #4ade80;
+  animation: pulseDot 1.4s infinite ease-in-out;
+}
+
+@keyframes pulseDot {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.6; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.karaoke-text {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #ffffff;
+}
+
+.karaoke-exit-pill {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+  padding: 4px 14px;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.karaoke-exit-pill:focus {
+  background: #ffffff;
+  color: #000000;
+  transform: scale(1.1);
+}
+
+/* Wide panoramic stage transformation */
+#fullscreen-player.karaoke-stage-active .player-body {
+  gap: 30px;
+  padding: 90px 80px 40px 80px;
+}
+
+#fullscreen-player.karaoke-stage-active .player-hero-column {
+  flex: 0 0 260px;
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#fullscreen-player.karaoke-stage-active .player-art-frame {
+  width: 240px;
+  height: 240px;
+  border-radius: 24px;
+  transition: all 0.5s ease;
+}
+
+#fullscreen-player.karaoke-stage-active .lyrics-stage {
+  font-size: 1.35em;
+  padding-left: 30px;
+}
+
+#fullscreen-player.karaoke-stage-active .lrc-line.active {
+  font-size: 48px;
+  text-shadow: 0 0 25px rgba(255, 255, 255, 0.9), 0 0 50px var(--dynamic-glow);
+}
+
+/* =====================================================================
+   SETTINGS FROSTED CARDS & AUDIO DSP CONTROLS
+   ===================================================================== */
+.settings-card {
+  background: var(--glass-capsule);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-radius: 28px;
+  padding: 28px 32px;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+}
+
+.settings-card-title {
+  font-size: 24px;
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 6px;
+}
+
+.settings-card-sub {
+  font-size: 15px;
+  color: var(--text-sub);
+  margin-bottom: 18px;
+}
+
+.pill-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pill-opt-btn {
+  padding: 10px 22px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1.5px solid transparent;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.pill-opt-btn.active {
+  background: var(--dynamic-accent);
+  color: #ffffff;
+  box-shadow: 0 4px 16px var(--dynamic-glow);
+}
+
+.pill-opt-btn:focus {
+  border-color: #ffffff;
+  transform: scale(1.08);
+  box-shadow: 0 0 20px var(--dynamic-glow);
+}
+
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.stats-table tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.stats-table tr:last-child {
+  border-bottom: none;
+}
+
+.stats-table td {
+  padding: 12px 0;
+  font-size: 15px;
+}
+
+.stats-table td:first-child {
+  color: var(--text-sub);
+}
+
+.stats-table td:last-child {
+  color: #ffffff;
+  font-weight: 700;
+  text-align: right;
+  font-family: monospace;
+}

@@ -1,0 +1,17 @@
+{
+  "version": "1.1.1",
+  "build": 103,
+  "releaseDate": "2026-11-21",
+  "minTizenVersion": "3.0",
+  "updateUrl": "https://raw.githubusercontent.com/impin2rex/laya-tizen-web/main/version.json",
+  "bundleBaseUrl": "https://raw.githubusercontent.com/impin2rex/laya-tizen-web/main/",
+  "changelog": "Clean home discovery shelves, moved audio DSP & stats to Settings view, removed sleep timer, fixed synchronous script bootloader and navigation.",
+  "files": [
+    "css/app.css",
+    "js/player/audio-dsp.js",
+    "js/player/audio-controller.js",
+    "js/providers/innertube.js",
+    "js/ui/views.js",
+    "index.html"
+  ]
+}

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget xmlns="http://www.w3.org/ns/widgets" 
+        xmlns:tizen="http://tizen.org/ns/widgets" 
+        id="http://layatv.local/LayaTV" 
+        version="1.0.0" 
+        viewmodes="fullscreen">
+    
+    <tizen:application id="layatv0001.LayaTV" 
+                       package="layatv0001" 
+                       version="1.0.0" 
+                       required_version="3.0"/>
+    
+    <content src="index.html"/>
+    
+    <name>Laya</name>
+    <description>Laya - Modern Music Experience for Samsung Smart TVs</description>
+    <author href="https://github.com/impin2rex/Laya">Laya Team</author>
+    <license>GPL-3.0-or-later</license>
+    
+    <icon src="assets/icon.png"/>
+    
+    <tizen:profile name="tv-samsung"/>
+    
+    <!-- Privileges -->
+    <tizen:privilege name="http://tizen.org/privilege/internet"/>
+    <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+    <tizen:privilege name="http://tizen.org/privilege/application.launch"/>
+    
+    <!-- TV Application Features -->
+    <feature name="http://tizen.org/feature/screen.size.all">true</feature>
+    <feature name="http://tizen.org/feature/network.internet">true</feature>
+    
+    <!-- Disable Samsung System IME to prevent OS virtual keyboard popup -->
+    <tizen:metadata key="http://samsung.com/tv/metadata/use.ime" value="false"/>
+    
+    <!-- Tizen Settings -->
+    <tizen:setting screen-orientation="landscape" 
+                   context-menu="disable" 
+                   background-support="enable" 
+                   encryption="disable" 
+                   install-location="auto" 
+                   hwkey-event="enable"/>
+    
+    <!-- Unrestricted network access for streaming media, album art & APIs -->
+    <access origin="*" subdomains="true"/>
+    <tizen:allow-navigation href="*"/>
+</widget>
