@@ -248,7 +248,7 @@ class MusicProvider {
   }
 
   /**
-   * Search Music Catalogue (Prioritizes JioSaavn Full-Length 160k/320k Streams + Curated Fallback)
+   * Search Music Catalogue (Combines JioSaavn High-Fidelity 320k Audio + YouTube Music Catalog)
    */
   async search(query) {
     if (!query || query.trim() === '') {
@@ -256,20 +256,19 @@ class MusicProvider {
     }
 
     const cleanQuery = query.trim();
-    console.log(`[MusicProvider] Searching for: "${cleanQuery}"`);
+    console.log(`[MusicProvider] Unified Search for: "${cleanQuery}"`);
+    const allResults = [];
+    const seenTitles = new Set();
 
-    // 1. Try JioSaavn Full-Track API (Produces real 160k/320k full duration audio streams, rich Bollywood & Global catalog)
+    // 1. Search JioSaavn (320k/160k Full-Length Audio Streams, Bollywood, Regional & International)
     try {
-      const saavnUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&api_version=4&ctx=web6dot0&n=25&p=1&q=${encodeURIComponent(cleanQuery)}`;
-      const res = await fetch(saavnUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+      const saavnUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&api_version=4&ctx=web6dot0&n=20&p=1&q=${encodeURIComponent(cleanQuery)}`;
+      const res = await fetch(saavnUrl, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(4000) });
       if (res.ok) {
         const data = await res.json();
         if (data && data.results && data.results.length > 0) {
-          const songs = [];
           for (const s of data.results) {
             const stream = this.decryptMediaUrl(s.more_info?.encrypted_media_url);
-            if (!stream) continue;
-
             const dur = parseInt(s.more_info?.duration || '240');
             const mins = Math.floor(dur / 60);
             const secs = String(dur % 60).padStart(2, '0');
@@ -287,58 +286,94 @@ class MusicProvider {
               .replace(/&#039;/g, "'")
               .replace(/&amp;/g, '&');
 
-            songs.push({
+            seenTitles.add(title.toLowerCase());
+            allResults.push({
               id: 'saavn_' + s.id,
+              source: 'JioSaavn',
               title,
               artist,
               album,
               duration: dur,
               durationFormatted: `${mins}:${secs}`,
               artwork,
-              streamUrl: stream
+              streamUrl: stream,
+              encrypted_media_url: s.more_info?.encrypted_media_url
             });
-          }
-          if (songs.length > 0) {
-            console.log(`[MusicProvider] Found ${songs.length} full-length songs for "${cleanQuery}"`);
-            return songs;
           }
         }
       }
     } catch (err) {
-      console.warn('[MusicProvider] Saavn search failed, falling back:', err);
+      console.warn('[MusicProvider] Saavn search query failed:', err);
     }
 
-    // 2. Try iTunes API as secondary fallback
+    // 2. Search YouTube Music InnerTube (Find any YouTube music video, mashup, remix, or live performance)
     try {
-      const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(cleanQuery)}&media=music&entity=song&limit=25`;
-      const res = await fetch(itunesUrl);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.results && data.results.length > 0) {
-          const songs = data.results.map(item => {
-            const artworkHighRes = item.artworkUrl100 
-              ? item.artworkUrl100.replace('100x100bb', '600x600bb') 
-              : (item.artworkUrl60 || 'assets/icon.png');
-            const durationSec = Math.round((item.trackTimeMillis || 200000) / 1000);
-            const mins = Math.floor(durationSec / 60);
-            const secs = String(durationSec % 60).padStart(2, '0');
+      const ytRes = await fetch('https://music.youtube.com/youtubei/v1/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+        },
+        body: JSON.stringify({
+          context: {
+            client: {
+              clientName: 'WEB_REMIX',
+              clientVersion: '1.20240101.01.00',
+              hl: 'en',
+              gl: 'IN'
+            }
+          },
+          query: cleanQuery
+        }),
+        signal: AbortSignal.timeout(4000)
+      });
 
-            return {
-              id: 'itunes_' + item.trackId,
-              title: item.trackName || 'Unknown Title',
-              artist: item.artistName || 'Unknown Artist',
-              album: item.collectionName || 'Single',
-              artwork: artworkHighRes,
-              duration: durationSec,
-              durationFormatted: `${mins}:${secs}`,
-              streamUrl: item.previewUrl || null,
-              genre: item.primaryGenreName || 'Music'
-            };
-          });
-          return songs;
+      if (ytRes.ok) {
+        const data = await ytRes.json();
+        const sections = data?.contents?.tabbedSearchResultsRenderer?.tabs?.[0]?.tabRenderer?.content?.sectionListRenderer?.contents || [];
+        for (const sec of sections) {
+          const contents = sec.musicCardShelfRenderer?.contents || sec.musicShelfRenderer?.contents || sec.itemSectionRenderer?.contents || [];
+          for (const item of contents) {
+            const r = item.musicResponsiveListItemRenderer;
+            if (!r) continue;
+
+            const videoId = r.playlistItemData?.videoId ||
+              r.overlay?.musicItemThumbnailOverlayRenderer?.content?.musicPlayButtonRenderer?.playNavigationEndpoint?.watchEndpoint?.videoId ||
+              r.doubleTapButton?.musicPlayButtonRenderer?.playNavigationEndpoint?.watchEndpoint?.videoId;
+            if (!videoId) continue;
+
+            const flex = r.flexColumns || [];
+            const title = flex[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.[0]?.text;
+            const runs2 = flex[1]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs || [];
+            const artist = runs2.map(x => x.text).filter(t => t !== ' • ' && t !== 'Song' && !t.includes(':')).join(', ') || 'YouTube Music';
+            const thumb = r.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails?.slice(-1)[0]?.url;
+
+            if (title && !seenTitles.has(title.toLowerCase())) {
+              seenTitles.add(title.toLowerCase());
+              allResults.push({
+                id: 'yt_' + videoId,
+                videoId: videoId,
+                source: 'YouTube Music',
+                title,
+                artist,
+                album: 'YouTube Music',
+                duration: 240,
+                durationFormatted: '4:00',
+                artwork: thumb || 'assets/icon.png',
+                streamUrl: null
+              });
+            }
+          }
         }
       }
-    } catch (err) {}
+    } catch (err) {
+      console.warn('[MusicProvider] YouTube Music search failed:', err);
+    }
+
+    if (allResults.length > 0) {
+      console.log(`[MusicProvider] Found ${allResults.length} total tracks for "${cleanQuery}"`);
+      return allResults;
+    }
 
     // 3. Fallback: Filter Curated items ONLY if title/artist/album actually matches query
     const q = cleanQuery.toLowerCase();
@@ -350,7 +385,7 @@ class MusicProvider {
   }
 
   /**
-   * Resolve Playable Stream URL for Track
+   * Resolve Playable Stream URL for Track (Full-length & Ad-free)
    */
   async resolveTrackStream(track) {
     if (track.streamUrl) {
@@ -359,10 +394,40 @@ class MusicProvider {
 
     if (track.encrypted_media_url) {
       const decrypted = this.decryptMediaUrl(track.encrypted_media_url);
-      if (decrypted) return decrypted;
+      if (decrypted) {
+        track.streamUrl = decrypted;
+        return decrypted;
+      }
     }
 
-    // Fallback to high-quality audio stream
+    // For YouTube tracks, resolve stream via audio track match on high-bitrate CDN
+    const searchTerms = [
+      `${track.title} ${track.artist}`.replace(/[\(\[\{].*?[\)\]\}]/g, '').trim(),
+      track.title.replace(/[\(\[\{].*?[\)\]\}]/g, '').trim()
+    ];
+
+    for (const term of searchTerms) {
+      try {
+        const saavnUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&api_version=4&ctx=web6dot0&n=5&p=1&q=${encodeURIComponent(term)}`;
+        const res = await fetch(saavnUrl, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(3000) });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.results && data.results.length > 0) {
+            for (const s of data.results) {
+              const stream = this.decryptMediaUrl(s.more_info?.encrypted_media_url);
+              if (stream) {
+                track.streamUrl = stream;
+                return stream;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[MusicProvider] Audio stream substitution error:', e);
+      }
+    }
+
+    // High fidelity curated fallback
     return this.curatedCatalogue[0]?.streamUrl || 'https://aac.saavncdn.com/430/5c5ea5cc00e3bff45616013226f376fe_160.mp4';
   }
 

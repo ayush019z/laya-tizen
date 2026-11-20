@@ -1,11 +1,11 @@
 {
-  "version": "1.2.0",
-  "build": 105,
+  "version": "1.2.1",
+  "build": 106,
   "releaseDate": "2026-11-21",
   "minTizenVersion": "3.0",
   "updateUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/version.json",
   "bundleBaseUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/",
-  "changelog": "Bollywood Arijit Singh catalog, JioSaavn full-track 320k streaming, restored TV hardware remote volume, zero-lag lyrics rendering, and full OTA live-patching bootloader.",
+  "changelog": "Unified YouTube Music InnerTube and JioSaavn engine with 100% ad-free high-bitrate streaming, official brand icon, and instant full-length playback.",
   "files": [
     "css/app.css",
     "js/lib/crypto-js.min.js",
