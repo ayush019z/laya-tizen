@@ -776,9 +776,13 @@ class UIViewController {
 
   // --- Audio Visualizer & Dual Script Controllers ---
   setupVisualizer() {
-    this.visualizerCanvas = document.getElementById('player-visualizer-canvas');
-    if (this.visualizerCanvas) {
-      this.visualizerCtx = this.visualizerCanvas.getContext('2d');
+    try {
+      this.visualizerCanvas = document.getElementById('player-visualizer-canvas');
+      if (this.visualizerCanvas && this.visualizerCanvas.getContext) {
+        this.visualizerCtx = this.visualizerCanvas.getContext('2d');
+      }
+    } catch (e) {
+      console.warn('Canvas context setup:', e);
     }
     this.isVisualizerActive = false;
   }
@@ -1176,6 +1180,19 @@ class UIViewController {
         const isLiked = window.Library.isFavorite(window.AudioPlayer.currentTrack.id);
         favBtn.querySelector('svg').style.fill = isLiked ? '#ff2a6d' : 'currentColor';
       }
+
+      // Ensure lyrics container is visible and active (reset queue overlay)
+      const lyricsContainer = document.getElementById('lyrics-container');
+      const queueContainer = document.getElementById('player-queue-container');
+      if (lyricsContainer) lyricsContainer.style.display = 'flex';
+      if (queueContainer) queueContainer.style.display = 'none';
+      this.showingQueue = false;
+
+      // Always render current lyrics when opening player
+      if (window.AudioPlayer && window.AudioPlayer.currentLyrics && window.AudioPlayer.currentLyrics.length > 0) {
+        this.renderLyrics(window.AudioPlayer.currentLyrics);
+      }
+
       const playBtn = document.getElementById('fs-play-pause-btn');
       if (playBtn && window.SpatialNav) {
         window.SpatialNav.setFocus(playBtn);

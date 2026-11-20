@@ -157,15 +157,31 @@ class AudioController {
   }
 
   async loadLyrics(track) {
-    if (window.LyricsService) {
-      this.currentLyrics = await window.LyricsService.fetchLyrics(track);
-    } else {
-      this.currentLyrics = await window.MusicProvider.getLyrics(track);
+    if (window.UIController) {
+      const container = document.getElementById('lyrics-container');
+      if (container) {
+        container.innerHTML = `
+          <div class="lyrics-scroll-track" style="padding: 100px 0;">
+            <div class="lrc-line active" style="font-size: 38px; color: rgba(255,255,255,0.7);">Loading lyrics for ${track.title}...</div>
+          </div>
+        `;
+      }
+    }
+
+    try {
+      if (window.LyricsService) {
+        this.currentLyrics = await window.LyricsService.fetchLyrics(track);
+      } else {
+        this.currentLyrics = await window.MusicProvider.getLyrics(track);
+      }
+    } catch (err) {
+      console.warn('[AudioController] Lyrics fetch failed:', err);
+      this.currentLyrics = [];
     }
 
     this.activeLyricIndex = -1;
     if (window.UIController) {
-      window.UIController.renderLyrics(this.currentLyrics);
+      window.UIController.renderLyrics(this.currentLyrics || []);
     }
   }
 

@@ -1,11 +1,11 @@
 {
-  "version": "1.3.5",
-  "build": 135,
+  "version": "1.3.6",
+  "build": 140,
   "releaseDate": "2026-11-21",
   "minTizenVersion": "3.0",
   "updateUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/version.json",
   "bundleBaseUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/",
-  "changelog": "Samsung OneRemote hardware key support: Play/Pause (⏯), Channel Rocker (∧/∨) track skipping, 4-Color Keys (🔴🟢🟡🔵), and Menu (☰) shortcuts.",
+  "changelog": "Fix fullscreen player viewport sizing on Samsung Tizen (replace inset:0 with top/left/right/bottom), remove WebKit mask hiding lyrics, stack player metadata cleanly, and add instant synced lyrics loading.",
   "files": [
     "index.html",
     "css/app.css",
