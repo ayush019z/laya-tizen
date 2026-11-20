@@ -212,8 +212,17 @@ class RemoteKeyController {
       return;
     }
 
-    // 6. Menu / Settings Button [ ☰ ] (10133 / 18)
-    if (keyCode === 10133 || keyCode === 18 || key === 'Menu' || key === 'MediaSettings') {
+    // 4-Dots Color Button on Samsung OneRemote (KeyCode 10071)
+    if (keyCode === 10071 || key === 'ColorFlick') {
+      e.preventDefault();
+      if (window.UIController) {
+        window.UIController.toggleKaraokeStage();
+      }
+      return;
+    }
+
+    // 6. Menu / Settings / 123 Button [ ☰ / ⚙️ / 123 ] (10133, 10182, 18)
+    if (keyCode === 10133 || keyCode === 10182 || keyCode === 18 || key === 'Menu' || key === 'MediaSettings' || key === 'Settings') {
       e.preventDefault();
       if (window.UIController) {
         const fsPlayer = document.getElementById('fullscreen-player');
@@ -229,6 +238,30 @@ class RemoteKeyController {
   }
 
   handleBackAction() {
+    // 0. If Wireless Mic Modal is open, close it
+    const micModal = document.getElementById('mic-modal');
+    if (micModal && (micModal.classList.contains('active') || micModal.style.display === 'flex')) {
+      if (window.UIController) {
+        window.UIController.closeMicModal();
+      } else {
+        micModal.classList.remove('active');
+        micModal.style.display = 'none';
+      }
+      return;
+    }
+
+    // 0.1. If Playlist Importer Modal is open, close it
+    const importModal = document.getElementById('import-modal');
+    if (importModal && (importModal.classList.contains('active') || importModal.style.display === 'flex')) {
+      if (window.UIController) {
+        window.UIController.closeImportModal();
+      } else {
+        importModal.classList.remove('active');
+        importModal.style.display = 'none';
+      }
+      return;
+    }
+
     // 1. If Party Modal is open, close it
     const partyModal = document.getElementById('party-modal');
     if (partyModal && (partyModal.classList.contains('active') || partyModal.style.display === 'flex')) {

@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>Laya Wireless Karaoke Mic</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #09090f;
+      --card: rgba(22, 22, 32, 0.85);
+      --accent: #ff2a6d;
+      --glow: rgba(255, 42, 109, 0.45);
+      --green: #4ade80;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      background: var(--bg);
+      color: #ffffff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 24px 20px;
+      overflow-x: hidden;
+    }
+    .header {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 20px;
+      font-weight: 800;
+    }
+    .status-pill {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .status-pill.live {
+      background: rgba(74, 222, 128, 0.18);
+      border-color: var(--green);
+      color: var(--green);
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #888;
+    }
+    .status-pill.live .dot {
+      background: var(--green);
+      box-shadow: 0 0 10px var(--green);
+    }
+    .mic-center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+      margin: 30px 0;
+    }
+    .mic-btn {
+      width: 180px;
+      height: 180px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #1f1f2e 0%, #12121a 100%);
+      border: 3px solid rgba(255, 255, 255, 0.18);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .mic-btn.active {
+      border-color: var(--accent);
+      background: radial-gradient(circle, rgba(255, 42, 109, 0.35) 0%, #151520 70%);
+      box-shadow: 0 0 60px var(--glow), 0 0 100px rgba(255, 42, 109, 0.2);
+      transform: scale(1.05);
+    }
+    .mic-icon-svg {
+      width: 64px;
+      height: 64px;
+      fill: #ffffff;
+      transition: transform 0.2s ease;
+    }
+    .mic-btn.active .mic-icon-svg {
+      fill: var(--accent);
+      transform: scale(1.1);
+    }
+    .mic-label {
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      margin-top: 8px;
+    }
+    .vu-bar-container {
+      width: 240px;
+      height: 12px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .vu-bar-fill {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, #4ade80 0%, #facc15 70%, #ff2a6d 100%);
+      border-radius: 6px;
+      transition: width 0.05s ease;
+    }
+    .controls-card {
+      width: 100%;
+      max-width: 360px;
+      background: var(--card);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 24px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .slider-row {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .slider-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.7);
+    }
+    input[type=range] {
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.15);
+      outline: none;
+      -webkit-appearance: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+      cursor: pointer;
+    }
+    .footer-hint {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.4);
+      text-align: center;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:#ff2a6d;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+      <span>Laya Karaoke Mic</span>
+    </div>
+    <div id="status-pill" class="status-pill">
+      <div class="dot"></div>
+      <span id="status-text">Ready</span>
+    </div>
+  </div>
+
+  <div class="mic-center">
+    <div id="mic-btn" class="mic-btn">
+      <svg class="mic-icon-svg" viewBox="0 0 24 24">
+        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5zm6 6c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+      </svg>
+      <span id="mic-label" class="mic-label">Tap to Sing</span>
+    </div>
+    <div class="vu-bar-container">
+      <div id="vu-bar-fill" class="vu-bar-fill"></div>
+    </div>
+  </div>
+
+  <div class="controls-card">
+    <div class="slider-row">
+      <div class="slider-label">
+        <span>🎤 Mic Sensitivity (Volume)</span>
+        <span id="mic-vol-num">100%</span>
+      </div>
+      <input id="mic-vol-slider" type="range" min="20" max="250" value="100"/>
+    </div>
+
+    <div class="slider-row">
+      <div class="slider-label">
+        <span>✨ Echo / Reverb (Singing Warmth)</span>
+        <span id="mic-echo-num">40%</span>
+      </div>
+      <input id="mic-echo-slider" type="range" min="0" max="100" value="40"/>
+    </div>
+  </div>
+
+  <div class="footer-hint">
+    Hold phone close to your mouth like a stage microphone.<br/>
+    Audio feeds live into your Samsung TV speakers!
+  </div>
+
+  <script>
+    let isLive = false;
+    let audioCtx = null;
+    let micStream = null;
+    let analyser = null;
+    let animId = null;
+
+    const micBtn = document.getElementById('mic-btn');
+    const micLabel = document.getElementById('mic-label');
+    const statusPill = document.getElementById('status-pill');
+    const statusText = document.getElementById('status-text');
+    const vuFill = document.getElementById('vu-bar-fill');
+    const volSlider = document.getElementById('mic-vol-slider');
+    const volNum = document.getElementById('mic-vol-num');
+    const echoSlider = document.getElementById('mic-echo-slider');
+    const echoNum = document.getElementById('mic-echo-num');
+
+    volSlider.addEventListener('input', (e) => {
+      volNum.textContent = e.target.value + '%';
+      broadcastMicSettings();
+    });
+
+    echoSlider.addEventListener('input', (e) => {
+      echoNum.textContent = e.target.value + '%';
+      broadcastMicSettings();
+    });
+
+    micBtn.addEventListener('click', async () => {
+      if (!isLive) {
+        await startMic();
+      } else {
+        stopMic();
+      }
+    });
+
+    async function startMic() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+        micStream = stream;
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const src = audioCtx.createMediaStreamSource(stream);
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 64;
+        src.connect(analyser);
+
+        isLive = true;
+        micBtn.classList.add('active');
+        micLabel.textContent = 'Singing Live!';
+        statusPill.classList.add('live');
+        statusText.textContent = 'LIVE ON TV';
+
+        // Notify TV
+        broadcastLiveMic(true);
+        runVUMeter();
+      } catch (err) {
+        alert('Microphone permission required to sing: ' + err.message);
+      }
+    }
+
+    function stopMic() {
+      if (micStream) {
+        micStream.getTracks().forEach(t => t.stop());
+      }
+      if (audioCtx) {
+        audioCtx.close();
+      }
+      cancelAnimationFrame(animId);
+      vuFill.style.width = '0%';
+      isLive = false;
+      micBtn.classList.remove('active');
+      micLabel.textContent = 'Tap to Sing';
+      statusPill.classList.remove('live');
+      statusText.textContent = 'Muted';
+      broadcastLiveMic(false);
+    }
+
+    function runVUMeter() {
+      if (!analyser || !isLive) return;
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      analyser.getByteFrequencyData(data);
+      let sum = 0;
+      for (let i = 0; i < data.length; i++) sum += data[i];
+      const avg = sum / data.length;
+      const pct = Math.min(100, Math.round((avg / 128) * 100));
+      vuFill.style.width = pct + '%';
+      animId = requestAnimationFrame(runVUMeter);
+    }
+
+    function broadcastLiveMic(active) {
+      try {
+        localStorage.setItem('layatv_phone_mic_state', JSON.stringify({
+          active,
+          volume: volSlider.value / 100,
+          echo: echoSlider.value / 100,
+          timestamp: Date.now()
+        }));
+      } catch (e) {}
+    }
+
+    function broadcastMicSettings() {
+      if (!isLive) return;
+      broadcastLiveMic(true);
+    }
+  </script>
+</body>
+</html>

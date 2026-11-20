@@ -5,7 +5,9 @@ class LibraryStore {
   constructor() {
     this.storageKeyFavorites = 'layatv_favorites';
     this.storageKeyHistory = 'layatv_history';
+    this.storageKeyPlaylists = 'layatv_playlists';
     this.favorites = this.load(this.storageKeyFavorites, []);
+    this.playlists = this.load(this.storageKeyPlaylists, []);
     this.history = this.load(this.storageKeyHistory, [
       {
         id: 'curated_espresso',
@@ -98,6 +100,38 @@ class LibraryStore {
 
   getHistory() {
     return this.history;
+  }
+
+  getPlaylists() {
+    return this.playlists || [];
+  }
+
+  savePlaylist(name, tracks, sourceUrl = '') {
+    if (!tracks || tracks.length === 0) return null;
+    const playlist = {
+      id: 'pl_' + Date.now(),
+      name: name || 'Imported Playlist',
+      tracks: tracks,
+      trackCount: tracks.length,
+      artwork: tracks[0]?.artwork || 'assets/icon.png',
+      sourceUrl,
+      createdAt: Date.now()
+    };
+    this.playlists.unshift(playlist);
+    this.save(this.storageKeyPlaylists, this.playlists);
+    if (window.UIController) {
+      window.UIController.showToast(`🎉 Imported "${playlist.name}" (${playlist.trackCount} tracks)!`);
+    }
+    return playlist;
+  }
+
+  deletePlaylist(playlistId) {
+    this.playlists = this.playlists.filter(p => p.id !== playlistId);
+    this.save(this.storageKeyPlaylists, this.playlists);
+    if (window.UIController) {
+      window.UIController.showToast('Playlist deleted');
+      window.UIController.renderLibrary();
+    }
   }
 
   getRelativeTime(timestamp) {

@@ -33,6 +33,8 @@ class UIViewController {
     this.setupKaraokeStage();
     this.setupVisualizer();
     this.setupDualScriptToggle();
+    this.setupPlaylistImporter();
+    this.setupWirelessMic();
     this.renderHome();
     this.renderVirtualKeyboard();
   }
@@ -496,6 +498,7 @@ class UIViewController {
     if (!container) return;
 
     const favorites = window.Library.getFavorites();
+    const importedPlaylists = window.Library.getPlaylists ? window.Library.getPlaylists() : [];
 
     let html = `
       <div class="shelf">
@@ -519,17 +522,34 @@ class UIViewController {
 
     html += `</div></div>`;
 
-    // Curated Playlists section
+    // Imported & Curated Playlists section
     html += `
       <div class="shelf">
-        <div class="shelf-title">Your Playlists</div>
+        <div class="shelf-title">Playlists & Imported Mixes (${importedPlaylists.length + 2})</div>
         <div class="shelf-track-container">
+    `;
+
+    // 1. Render user imported playlists first
+    if (importedPlaylists.length > 0) {
+      importedPlaylists.forEach(pl => {
+        html += `
+          <div class="media-card focusable" tabindex="0" data-imported-id="${pl.id}">
+            <div class="media-card-artwork"><img src="${pl.artwork || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80'}"/></div>
+            <div class="media-card-title">${pl.title}</div>
+            <div class="media-card-author">${pl.tracks ? pl.tracks.length : 0} Tracks • ${pl.source || 'Imported'}</div>
+          </div>
+        `;
+      });
+    }
+
+    // 2. Curated playlists
+    html += `
           <div class="media-card focusable" tabindex="0" data-playlist="chill">
             <div class="media-card-artwork"><img src="https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&auto=format&fit=crop&q=80"/></div>
             <div class="media-card-title">Chill Soundscapes</div>
             <div class="media-card-author">5 Tracks • Ambient</div>
           </div>
-          <div class="media-card-focusable media-card focusable" tabindex="0" data-playlist="trending">
+          <div class="media-card focusable" tabindex="0" data-playlist="trending">
             <div class="media-card-artwork"><img src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80"/></div>
             <div class="media-card-title">Short n' Sweet Hits</div>
             <div class="media-card-author">Sabrina & Friends</div>
@@ -553,7 +573,20 @@ class UIViewController {
       });
     });
 
-    container.querySelectorAll('.media-card').forEach(card => {
+    container.querySelectorAll('[data-imported-id]').forEach(card => {
+      card.addEventListener('click', () => {
+        const plId = card.getAttribute('data-imported-id');
+        const pl = importedPlaylists.find(p => p.id === plId);
+        if (pl && pl.tracks && pl.tracks.length > 0) {
+          window.Queue.setQueue(pl.tracks, 0);
+          window.AudioPlayer.playTrack(pl.tracks[0]);
+          this.openFullscreenPlayer();
+          this.showToast(`▶️ Playing "${pl.title}" (${pl.tracks.length} songs)`);
+        }
+      });
+    });
+
+    container.querySelectorAll('[data-playlist]').forEach(card => {
       card.addEventListener('click', () => {
         const tracks = window.MusicProvider.curatedCatalogue;
         window.Queue.setQueue(tracks, 0);
@@ -701,6 +734,21 @@ class UIViewController {
       });
     }
 
+    // Wireless Mic Button in Player & Karaoke Banner
+    const micBtn = document.getElementById('btn-wireless-mic');
+    if (micBtn) {
+      micBtn.addEventListener('click', () => {
+        this.openMicModal();
+      });
+    }
+
+    const karaokeMicBtn = document.getElementById('btn-karaoke-connect-mic');
+    if (karaokeMicBtn) {
+      karaokeMicBtn.addEventListener('click', () => {
+        this.openMicModal();
+      });
+    }
+
     // Settings Button in Player
     const playerSettingsBtn = document.getElementById('btn-player-settings') || document.getElementById('btn-tweaks-track');
     if (playerSettingsBtn) {
@@ -722,6 +770,9 @@ class UIViewController {
       'fs-shuffle-btn': 'Shuffle',
       'fs-repeat-btn': 'Repeat',
       'btn-karaoke-stage': 'Vocals Mode',
+      'btn-wireless-mic': 'Wireless Mic',
+      'btn-karaoke-connect-mic': 'Phone Mic',
+      'btn-open-importer': 'Import Playlist',
       'btn-toggle-visualizer': 'Visualizer',
       'btn-toggle-dual-lyrics': 'Dual Script',
       'btn-party-jukebox': 'Party Jukebox',
@@ -1505,6 +1556,257 @@ class UIViewController {
       fsPlayer.classList.remove('karaoke-stage-active');
       document.querySelectorAll('.vocal-sing-ball').forEach(b => b.remove());
       this.showToast('Vocals Mode Turned Off');
+    }
+  }
+
+  // =====================================================================
+  // FEATURE 3: PHONE AS WIRELESS KARAOKE MICROPHONE
+  // =====================================================================
+  setupWirelessMic() {
+    const closeBtn = document.getElementById('btn-close-mic');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => this.closeMicModal());
+    }
+
+    const testBtn = document.getElementById('btn-toggle-mic-test');
+    if (testBtn) {
+      testBtn.addEventListener('click', () => {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+            .then(stream => {
+              if (window.AudioDSP) {
+                window.AudioDSP.attachMicrophoneStream(stream);
+                this.showToast('🎙️ Live Microphone Input Attached to TV!');
+              }
+            })
+            .catch(err => {
+              console.warn('TV Mic access error:', err);
+              this.showToast('ℹ️ TV Mic requires USB / Bluetooth Mic or Phone link');
+            });
+        } else {
+          this.showToast('ℹ️ Open mic.html on your phone to stream voice');
+        }
+      });
+    }
+
+    const echoBtn = document.getElementById('btn-mic-echo-toggle');
+    if (echoBtn) {
+      echoBtn.addEventListener('click', () => {
+        if (window.AudioDSP) {
+          const current = window.AudioDSP.micEchoGain ? window.AudioDSP.micEchoGain.gain.value : 0;
+          const nextVal = current > 0.05 ? 0.0 : 0.45;
+          window.AudioDSP.setMicEcho(nextVal);
+          const echoStatus = document.getElementById('tv-mic-echo-status');
+          if (echoStatus) echoStatus.textContent = nextVal > 0 ? 'ON (160ms)' : 'OFF';
+          this.showToast(`Concert Echo: ${nextVal > 0 ? 'ON' : 'OFF'}`);
+        }
+      });
+    }
+
+    // Monitor Phone Mic Link State
+    setInterval(() => {
+      try {
+        const stateRaw = localStorage.getItem('layatv_phone_mic_state');
+        if (stateRaw) {
+          const state = JSON.parse(stateRaw);
+          const statusPill = document.getElementById('mic-connection-status');
+          const statusText = document.getElementById('mic-status-text');
+          if (state && state.connected && Date.now() - (state.timestamp || 0) < 6000) {
+            if (statusPill && !statusPill.classList.contains('connected')) {
+              statusPill.className = 'mic-status-pill connected';
+              if (statusText) statusText.textContent = 'Phone Mic Connected (Live)';
+              this.showToast('🎙️ Phone Microphone Connected! Sing into your phone.');
+            }
+          } else if (statusPill && statusPill.classList.contains('connected')) {
+            statusPill.className = 'mic-status-pill disconnected';
+            if (statusText) statusText.textContent = 'Waiting for phone...';
+          }
+        }
+      } catch (e) {}
+    }, 2000);
+  }
+
+  openMicModal() {
+    const modal = document.getElementById('mic-modal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+
+    const qrTarget = document.getElementById('mic-qr-canvas');
+    const micUrl = window.location.origin ? (window.location.origin + '/mic.html') : 'http://layatv.local/mic.html';
+    if (qrTarget && window.generateQRCodeSVG) {
+      try {
+        qrTarget.innerHTML = window.generateQRCodeSVG(micUrl, 236);
+      } catch (e) {
+        console.warn('QR code gen error:', e);
+      }
+    }
+
+    setTimeout(() => {
+      const focusTarget = document.getElementById('btn-toggle-mic-test') || document.getElementById('btn-close-mic') || modal.querySelector('.focusable');
+      if (focusTarget && window.SpatialNav) {
+        window.SpatialNav.setFocus(focusTarget);
+      }
+    }, 80);
+  }
+
+  closeMicModal() {
+    const modal = document.getElementById('mic-modal');
+    if (!modal) return;
+    modal.classList.remove('active');
+    modal.style.display = 'none';
+
+    if (window.SpatialNav) {
+      const micBtn = document.getElementById('btn-wireless-mic') || document.getElementById('fs-play-pause-btn');
+      if (micBtn) {
+        window.SpatialNav.setFocus(micBtn);
+      } else {
+        window.SpatialNav.validateFocus();
+      }
+    }
+  }
+
+  // =====================================================================
+  // FEATURE 2: INSTANT PLAYLIST IMPORTER
+  // =====================================================================
+  setupPlaylistImporter() {
+    const openBtn = document.getElementById('btn-open-importer');
+    if (openBtn) {
+      openBtn.addEventListener('click', () => this.openImportModal());
+    }
+
+    const closeBtn = document.getElementById('btn-close-import');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => this.closeImportModal());
+    }
+
+    const execBtn = document.getElementById('btn-execute-import');
+    if (execBtn) {
+      execBtn.addEventListener('click', () => this.executePlaylistImport());
+    }
+
+    const sampleBtn = document.getElementById('btn-import-sample');
+    if (sampleBtn) {
+      sampleBtn.addEventListener('click', () => {
+        const input = document.getElementById('import-url-input');
+        if (input) {
+          input.value = 'Arijit Singh - Kesariya\nDiljit Dosanjh - Lover\nBadshah - Jugnu\nShreya Ghoshal - Deewani Mastani\nAP Dhillon - With You';
+          this.executePlaylistImport();
+        }
+      });
+    }
+
+    // Monitor Phone Remote Playlist Submissions via localStorage
+    setInterval(() => {
+      try {
+        const pendingRaw = localStorage.getItem('layatv_pending_import');
+        if (pendingRaw) {
+          localStorage.removeItem('layatv_pending_import');
+          const data = JSON.parse(pendingRaw);
+          if (data && data.content) {
+            this.showToast('📲 Received playlist link from phone! Importing...');
+            const input = document.getElementById('import-url-input');
+            if (input) input.value = data.content;
+            this.executePlaylistImport();
+          }
+        }
+      } catch (e) {}
+    }, 2000);
+  }
+
+  openImportModal() {
+    const modal = document.getElementById('import-modal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+
+    const qrTarget = document.getElementById('import-qr-canvas');
+    const importUrl = window.location.origin ? (window.location.origin + '/import.html') : 'http://layatv.local/import.html';
+    if (qrTarget && window.generateQRCodeSVG) {
+      try {
+        qrTarget.innerHTML = window.generateQRCodeSVG(importUrl, 236);
+      } catch (e) {
+        console.warn('QR code gen error:', e);
+      }
+    }
+
+    setTimeout(() => {
+      const input = document.getElementById('import-url-input');
+      if (input && window.SpatialNav) {
+        window.SpatialNav.setFocus(input);
+      }
+    }, 80);
+  }
+
+  closeImportModal() {
+    const modal = document.getElementById('import-modal');
+    if (!modal) return;
+    modal.classList.remove('active');
+    modal.style.display = 'none';
+
+    if (window.SpatialNav) {
+      const openBtn = document.getElementById('btn-open-importer');
+      if (openBtn) {
+        window.SpatialNav.setFocus(openBtn);
+      } else {
+        window.SpatialNav.validateFocus();
+      }
+    }
+  }
+
+  async executePlaylistImport() {
+    const input = document.getElementById('import-url-input');
+    const val = input ? input.value.trim() : '';
+    if (!val) {
+      this.showToast('⚠️ Please enter a playlist URL or song titles first');
+      return;
+    }
+
+    const progressBox = document.getElementById('import-progress-box');
+    const progressBar = document.getElementById('import-progress-bar');
+    const statusText = document.getElementById('import-status-text');
+    const progressCount = document.getElementById('import-progress-count');
+
+    if (progressBox) progressBox.style.display = 'block';
+
+    const onProgress = (percent, msg) => {
+      if (progressBar) progressBar.style.width = percent + '%';
+      if (progressCount) progressCount.textContent = Math.round(percent) + '%';
+      if (statusText) statusText.textContent = msg;
+    };
+
+    try {
+      if (!window.PlaylistImporter) {
+        throw new Error('PlaylistImporter not loaded');
+      }
+
+      onProgress(10, 'Analyzing playlist format...');
+      const playlist = await window.PlaylistImporter.importPlaylist(val, onProgress);
+
+      if (playlist && playlist.tracks && playlist.tracks.length > 0) {
+        if (window.Library && window.Library.savePlaylist) {
+          window.Library.savePlaylist(playlist);
+        }
+
+        onProgress(100, `Done! Imported ${playlist.tracks.length} tracks.`);
+        this.showToast(`🎉 Imported "${playlist.title}" with ${playlist.tracks.length} songs!`);
+        
+        setTimeout(() => {
+          this.closeImportModal();
+          if (progressBox) progressBox.style.display = 'none';
+          if (input) input.value = '';
+          this.renderLibrary();
+        }, 1200);
+      } else {
+        throw new Error('No playable tracks could be resolved');
+      }
+    } catch (err) {
+      console.error('Playlist import failed:', err);
+      if (statusText) statusText.textContent = 'Import failed: ' + (err.message || 'Unknown error');
+      this.showToast('❌ Import error: ' + (err.message || 'Check URL'));
+      setTimeout(() => {
+        if (progressBox) progressBox.style.display = 'none';
+      }, 3000);
     }
   }
 

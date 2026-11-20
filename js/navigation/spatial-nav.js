@@ -22,6 +22,14 @@ class SpatialNavigator {
   }
 
   getFocusableElements(container = document) {
+    const micModal = document.getElementById('mic-modal');
+    if (micModal && (micModal.classList.contains('active') || micModal.style.display === 'flex')) {
+      container = micModal;
+    }
+    const importModal = document.getElementById('import-modal');
+    if (importModal && (importModal.classList.contains('active') || importModal.style.display === 'flex')) {
+      container = importModal;
+    }
     const partyModal = document.getElementById('party-modal');
     if (partyModal && (partyModal.classList.contains('active') || partyModal.style.display === 'flex')) {
       container = partyModal;
@@ -70,6 +78,15 @@ class SpatialNavigator {
 
     const nameMap = {
       'btn-karaoke-stage': 'Vocals Mode',
+      'btn-wireless-mic': 'Wireless Mic',
+      'btn-karaoke-connect-mic': 'Phone Mic',
+      'btn-open-importer': 'Import Playlist',
+      'btn-execute-import': 'Import Now',
+      'btn-import-sample': 'Demo Bollywood Mix',
+      'btn-close-import': 'Close',
+      'btn-close-mic': 'Close',
+      'btn-toggle-mic-test': 'Test Mic',
+      'btn-mic-echo-toggle': 'Toggle Echo',
       'btn-toggle-visualizer': 'Visualizer',
       'btn-toggle-dual-lyrics': 'Dual Script',
       'btn-party-jukebox': 'Party Jukebox',

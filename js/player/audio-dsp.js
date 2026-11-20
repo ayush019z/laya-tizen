@@ -340,13 +340,74 @@ class AudioDSPEngine {
     this.updateStats();
   }
 
+  // --- Live Wireless Karaoke Microphone Engine ---
+  attachMicrophoneStream(stream) {
+    if (!this.ctx || !stream) return;
+    try {
+      this.detachMicrophoneStream(); // clean prior connection
+
+      this.micSource = this.ctx.createMediaStreamSource(stream);
+      this.micGainNode = this.ctx.createGain();
+      this.micGainNode.gain.value = 1.35; // clean vocal lift
+
+      // Studio Reverb / Delay feedback loop for singing warmth
+      this.micDelayNode = this.ctx.createDelay();
+      this.micDelayNode.delayTime.value = 0.16; // 160ms slapback echo
+      this.micFeedbackNode = this.ctx.createGain();
+      this.micFeedbackNode.gain.value = 0.32; // gentle musical decay
+
+      this.micDelayNode.connect(this.micFeedbackNode);
+      this.micFeedbackNode.connect(this.micDelayNode);
+
+      // Route dry voice + echo directly to master output
+      this.micSource.connect(this.micGainNode);
+      this.micGainNode.connect(this.masterGain);
+      this.micGainNode.connect(this.micDelayNode);
+      this.micDelayNode.connect(this.masterGain);
+
+      this.isMicActive = true;
+      this.updateStats();
+      if (window.UIController) {
+        window.UIController.showToast('🎤 Wireless Karaoke Mic is LIVE on TV speakers!');
+      }
+    } catch (err) {
+      console.warn('[AudioDSP] Could not attach microphone stream:', err);
+    }
+  }
+
+  detachMicrophoneStream() {
+    if (this.micSource) {
+      try {
+        this.micSource.disconnect();
+        this.micGainNode?.disconnect();
+        this.micDelayNode?.disconnect();
+        this.micFeedbackNode?.disconnect();
+      } catch (e) {}
+    }
+    this.micSource = null;
+    this.isMicActive = false;
+    this.updateStats();
+  }
+
+  setMicGain(val) {
+    if (this.micGainNode && this.ctx) {
+      this.micGainNode.gain.setTargetAtTime(val, this.ctx.currentTime, 0.04);
+    }
+  }
+
+  setMicEcho(val) {
+    if (this.micFeedbackNode && this.ctx) {
+      this.micFeedbackNode.gain.setTargetAtTime(val, this.ctx.currentTime, 0.04);
+    }
+  }
+
   // --- Stats for Nerds Telemetry ---
   updateStats() {
     if (this.ctx) {
       this.stats.sampleRate = `${this.ctx.sampleRate} Hz`;
       this.stats.latency = `${Math.round(this.ctx.baseLatency * 1000 || 12)}ms`;
     }
-    this.stats.dspActive = `Reverb: ${this.reverbPreset.toUpperCase()} | Karaoke: ${this.karaokeEnabled ? 'ON' : 'OFF'}`;
+    this.stats.dspActive = `Reverb: ${this.reverbPreset.toUpperCase()} | Karaoke: ${this.karaokeEnabled ? 'ON' : 'OFF'} | Mic: ${this.isMicActive ? 'LIVE' : 'OFF'}`;
   }
 
   getStats() {
