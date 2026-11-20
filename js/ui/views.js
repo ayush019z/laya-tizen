@@ -725,9 +725,12 @@ class UIViewController {
   }
 
   // --- 6. Apple-Style Word-Synced Lyrics Renderer (am-lyrics) ---
-  processLyricsWithInstrumentals(rawLyrics) {
+  processLyricsWithInstrumentals(rawLyrics, currentTrack = null) {
     if (!rawLyrics || rawLyrics.length === 0) return [];
     const processed = [];
+
+    const artistStr = (currentTrack?.artist || '').toLowerCase();
+    const isCollab = artistStr.includes('&') || artistStr.includes(',') || artistStr.includes('feat.') || artistStr.includes('ft.');
 
     // 1. Intro Instrumental: if first line starts after 4.0 seconds
     if (rawLyrics[0].time > 4.0) {
@@ -738,8 +741,50 @@ class UIViewController {
       });
     }
 
+    let activeSingerRole = 'lead';
+
     for (let i = 0; i < rawLyrics.length; i++) {
-      processed.push(rawLyrics[i]);
+      const item = { ...rawLyrics[i] };
+      let text = item.text || '';
+      let singerRole = 'lead';
+      let singerName = '';
+
+      // Check explicit speaker/singer pattern: [Singer]: or (Singer): or Singer:
+      const tagMatch = text.match(/^\[([a-zA-Z0-9\s]+)\]:?\s*/i) ||
+                       text.match(/^\(([a-zA-Z0-9\s]{2,16})\):?\s*/i) ||
+                       text.match(/^([a-zA-Z0-9\s]{2,16}):\s+/i);
+
+      if (tagMatch) {
+        const rawTag = tagMatch[1].trim();
+        const lowerTag = rawTag.toLowerCase();
+        const skipWords = ['verse', 'chorus', 'intro', 'outro', 'hook', 'bridge', 'instrumental', 'music', 'tune'];
+        if (!skipWords.some(w => lowerTag.startsWith(w))) {
+          singerName = rawTag;
+          text = text.slice(tagMatch[0].length).trim();
+          item.text = text;
+          if (lowerTag.includes('female') || lowerTag.includes('2') || lowerTag.includes('guest') || lowerTag.includes('woman') || lowerTag.includes('her')) {
+            singerRole = 'duet';
+          } else if (lowerTag.includes('male') || lowerTag.includes('1') || lowerTag.includes('lead')) {
+            singerRole = 'lead';
+          } else {
+            singerRole = 'duet';
+          }
+        }
+      } else if (text.startsWith('(') && text.endsWith(')') && text.length > 2) {
+        // Parenthetical backing / harmony vocals
+        singerRole = 'backing';
+      } else if (isCollab) {
+        // Alternating vocalist switch on long pause
+        if (i > 0 && rawLyrics[i].time - rawLyrics[i - 1].time > 5.5) {
+          activeSingerRole = (activeSingerRole === 'lead' ? 'duet' : 'lead');
+        }
+        singerRole = activeSingerRole;
+      }
+
+      item.singerRole = singerRole;
+      if (singerName) item.singerName = singerName;
+
+      processed.push(item);
 
       // 2. Interlude Instrumental: if gap between lines > 6.0 seconds
       if (i < rawLyrics.length - 1) {
@@ -766,8 +811,9 @@ class UIViewController {
       return;
     }
 
-    // Process lyrics to insert Apple Music style instrumental interludes
-    const processedLyrics = this.processLyricsWithInstrumentals(lyrics);
+    // Process lyrics to insert Apple Music style instrumental interludes & duet color coding
+    const track = window.AudioPlayer?.currentTrack;
+    const processedLyrics = this.processLyricsWithInstrumentals(lyrics, track);
     if (window.AudioPlayer) {
       window.AudioPlayer.currentLyrics = processedLyrics;
     }
@@ -793,7 +839,16 @@ class UIViewController {
           </div>
         `;
       } else {
-        lineElem.className = 'lrc-line focusable';
+        const singerClass = line.singerRole ? `singer-${line.singerRole}` : 'singer-lead';
+        lineElem.className = `lrc-line focusable ${singerClass}`;
+
+        if (line.singerName) {
+          const badge = document.createElement('span');
+          badge.className = 'singer-badge';
+          badge.textContent = line.singerName;
+          lineElem.appendChild(badge);
+        }
+
         // Render each word
         if (line.words && line.words.length > 0) {
           line.words.forEach((w) => {
@@ -804,7 +859,8 @@ class UIViewController {
             lineElem.appendChild(wordSpan);
           });
         } else {
-          lineElem.textContent = line.text;
+          const textNode = document.createTextNode(line.text);
+          lineElem.appendChild(textNode);
         }
       }
 
