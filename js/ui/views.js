@@ -668,38 +668,32 @@ class UIViewController {
 
   setupButtonPreviews() {
     const previewMap = {
-      'fs-play-pause-btn': { action: 'Play / Pause', desc: 'Toggle music playback' },
-      'fs-prev-btn': { action: 'Previous Track', desc: 'Restart track or go to previous' },
-      'fs-next-btn': { action: 'Next Track', desc: 'Skip to next song in queue' },
-      'fs-shuffle-btn': { action: 'Shuffle Queue', desc: 'Randomize playback order' },
-      'fs-repeat-btn': { action: 'Repeat Mode', desc: 'Repeat current song or playlist' },
-      'btn-karaoke-stage': { action: 'Vocals Mode (Karaoke)', desc: 'Attenuate center vocals for singing' },
-      'btn-party-jukebox': { action: 'Party Jukebox', desc: 'Scan QR code to let guests queue songs' },
-      'btn-fav-track': { action: 'Liked Songs', desc: 'Save to or remove from your favorites' },
-      'btn-toggle-queue': { action: 'Upcoming Queue', desc: 'View and manage upcoming queue' },
-      'btn-player-settings': { action: 'Audio FX & Reverb', desc: '5-band EQ, studio reverb & sleep timer' },
-      'player-scrubber-track': { action: 'Scrubber / Seek', desc: 'Press OK to jump to position' },
-      'btn-exit-karaoke': { action: 'Exit Vocals Mode', desc: 'Return to normal audio' }
+      'fs-play-pause-btn': 'Play / Pause',
+      'fs-prev-btn': 'Previous',
+      'fs-next-btn': 'Next',
+      'fs-shuffle-btn': 'Shuffle',
+      'fs-repeat-btn': 'Repeat',
+      'btn-karaoke-stage': 'Vocals Mode',
+      'btn-party-jukebox': 'Party Jukebox',
+      'btn-fav-track': 'Favorite',
+      'btn-toggle-queue': 'Queue',
+      'btn-player-settings': 'Audio FX',
+      'player-scrubber-track': 'Seek',
+      'btn-exit-karaoke': 'Exit Vocals Mode'
     };
 
     const previewBadge = document.getElementById('player-btn-preview');
     if (!previewBadge) return;
 
     const actionText = previewBadge.querySelector('.preview-badge-action');
-    const descText = previewBadge.querySelector('.preview-badge-desc');
 
-    const updateBadge = (info) => {
-      if (actionText) actionText.textContent = info.action;
-      if (descText) descText.textContent = info.desc;
-      previewBadge.style.opacity = '1';
-      previewBadge.style.transform = 'scale(1.02)';
+    const updateBadge = (name) => {
+      if (actionText) actionText.textContent = name;
+      previewBadge.classList.add('visible');
     };
 
     const resetBadge = () => {
-      if (actionText) actionText.textContent = 'Laya Controls';
-      if (descText) descText.textContent = 'Select control with TV remote';
-      previewBadge.style.opacity = '0.7';
-      previewBadge.style.transform = 'scale(1)';
+      previewBadge.classList.remove('visible');
     };
 
     Object.keys(previewMap).forEach(btnId => {
