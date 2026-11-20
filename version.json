@@ -1,11 +1,11 @@
 {
-  "version": "1.3.4",
-  "build": 130,
+  "version": "1.3.5",
+  "build": 135,
   "releaseDate": "2026-11-21",
   "minTizenVersion": "3.0",
   "updateUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/version.json",
   "bundleBaseUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/",
-  "changelog": "Neon Wave Audio Visualizer, Seamless DJ Crossfade & Automix, Dual-Script Romanized Lyrics, Apple Music Sing Bouncing Vocal Guide, and Instant Artist & Mood Mixes Shelf.",
+  "changelog": "Samsung OneRemote hardware key support: Play/Pause (⏯), Channel Rocker (∧/∨) track skipping, 4-Color Keys (🔴🟢🟡🔵), and Menu (☰) shortcuts.",
   "files": [
     "index.html",
     "css/app.css",

@@ -1353,6 +1353,15 @@ class UIViewController {
     }
   }
 
+  togglePartyModal() {
+    const modal = document.getElementById('party-modal');
+    if (modal && (modal.classList.contains('active') || modal.style.display === 'flex')) {
+      this.closePartyModal();
+    } else {
+      this.openPartyModal();
+    }
+  }
+
   handleGuestSongArrival(track) {
     if (!track) return;
     if (window.Queue) {

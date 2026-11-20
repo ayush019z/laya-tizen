@@ -6,6 +6,8 @@ class RemoteKeyController {
     this.tizenKeys = [
       'Enter',
       'Select',
+      'ChannelUp',
+      'ChannelDown',
       'MediaPlay',
       'MediaPause',
       'MediaPlayPause',
@@ -18,6 +20,13 @@ class RemoteKeyController {
       'ColorF1Green',
       'ColorF2Yellow',
       'ColorF3Blue',
+      'ColorFlick',
+      'Search',
+      'VoiceSearch',
+      'Menu',
+      'MediaSettings',
+      'Info',
+      'Guide',
       '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
     ];
     this.registerTizenKeys();
@@ -96,43 +105,126 @@ class RemoteKeyController {
       return;
     }
 
-    // Media Keys
-    switch (keyCode) {
-      case 415: // MediaPlay
-      case 19:  // Pause
-      case 413: // MediaStop
-      case 10252: // MediaPlayPause
-        if (window.AudioPlayer) {
-          e.preventDefault();
-          window.AudioPlayer.togglePlayPause();
+    // 1. Samsung Play / Pause Button [ ⏯ ]
+    if (
+      keyCode === 415 || // MediaPlay
+      keyCode === 19 ||  // Pause
+      keyCode === 10252 || // MediaPlayPause
+      keyCode === 179 || // W3C VK_PLAY_PAUSE
+      key === 'MediaPlayPause' ||
+      key === 'PlayPause' ||
+      key === 'Play' ||
+      key === 'Pause'
+    ) {
+      if (window.AudioPlayer) {
+        e.preventDefault();
+        window.AudioPlayer.togglePlayPause();
+        if (window.UIController) {
+          setTimeout(() => {
+            const isPlaying = window.AudioPlayer.isPlaying;
+            window.UIController.showToast(isPlaying ? '▶️ Playing' : '⏸️ Paused');
+          }, 60);
         }
-        break;
-      case 417: // MediaFastForward
-        if (window.AudioPlayer) {
-          e.preventDefault();
-          window.AudioPlayer.seekRelative(10);
+      }
+      return;
+    }
+
+    // 2. Samsung Channel Rocker UP [ ∧ ] (Next Track)
+    if (
+      keyCode === 427 || // Tizen ChannelUp
+      keyCode === 10233 || // MediaTrackNext
+      key === 'ChannelUp' ||
+      key === 'MediaTrackNext'
+    ) {
+      if (window.AudioPlayer) {
+        e.preventDefault();
+        window.AudioPlayer.playNext();
+        if (window.UIController) {
+          window.UIController.showToast('⏭️ Skipping to Next Track');
         }
-        break;
-      case 412: // MediaRewind
-        if (window.AudioPlayer) {
-          e.preventDefault();
-          window.AudioPlayer.seekRelative(-10);
+      }
+      return;
+    }
+
+    // 3. Samsung Channel Rocker DOWN [ ∨ ] (Previous Track)
+    if (
+      keyCode === 428 || // Tizen ChannelDown
+      keyCode === 10232 || // MediaTrackPrevious
+      key === 'ChannelDown' ||
+      key === 'MediaTrackPrevious'
+    ) {
+      if (window.AudioPlayer) {
+        e.preventDefault();
+        window.AudioPlayer.playPrevious();
+        if (window.UIController) {
+          window.UIController.showToast('⏮️ Skipping to Previous Track');
         }
-        break;
-      case 10232: // MediaTrackPrevious
-        if (window.AudioPlayer) {
-          e.preventDefault();
-          window.AudioPlayer.playPrevious();
+      }
+      return;
+    }
+
+    // 4. Media Fast Forward & Rewind
+    if (keyCode === 417 || key === 'MediaFastForward') {
+      if (window.AudioPlayer) {
+        e.preventDefault();
+        window.AudioPlayer.seekRelative(10);
+        if (window.UIController) window.UIController.showToast('⏩ Fast Forward +10s');
+      }
+      return;
+    }
+
+    if (keyCode === 412 || key === 'MediaRewind') {
+      if (window.AudioPlayer) {
+        e.preventDefault();
+        window.AudioPlayer.seekRelative(-10);
+        if (window.UIController) window.UIController.showToast('⏪ Rewind -10s');
+      }
+      return;
+    }
+
+    // 5. Samsung 4-Color Keys [ 🔴🟢🟡🔵 ]
+    // Red (403): Like / Favorite
+    if (keyCode === 403 || key === 'ColorF0Red') {
+      e.preventDefault();
+      const favBtn = document.getElementById('btn-fav-track');
+      if (favBtn) favBtn.click();
+      return;
+    }
+
+    // Green (404): Vocals Mode / Karaoke
+    if (keyCode === 404 || key === 'ColorF1Green') {
+      e.preventDefault();
+      if (window.UIController) window.UIController.toggleKaraokeStage();
+      return;
+    }
+
+    // Yellow (405): Spectrum Visualizer
+    if (keyCode === 405 || key === 'ColorF2Yellow') {
+      e.preventDefault();
+      if (window.UIController) window.UIController.toggleVisualizer();
+      return;
+    }
+
+    // Blue (406): Party Jukebox QR Code
+    if (keyCode === 406 || key === 'ColorF3Blue') {
+      e.preventDefault();
+      if (window.UIController) window.UIController.togglePartyModal();
+      return;
+    }
+
+    // 6. Menu / Settings Button [ ☰ ] (10133 / 18)
+    if (keyCode === 10133 || keyCode === 18 || key === 'Menu' || key === 'MediaSettings') {
+      e.preventDefault();
+      if (window.UIController) {
+        const fsPlayer = document.getElementById('fullscreen-player');
+        if (fsPlayer && fsPlayer.classList.contains('active')) {
+          const settingsBtn = document.getElementById('btn-player-settings');
+          if (settingsBtn) settingsBtn.click();
+        } else {
+          window.UIController.switchView('settings');
         }
-        break;
-      case 10233: // MediaTrackNext
-        if (window.AudioPlayer) {
-          e.preventDefault();
-          window.AudioPlayer.playNext();
-        }
-        break;
-      default:
-        break;
+      }
+      return;
     }
   }
 
