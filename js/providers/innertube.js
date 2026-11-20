@@ -485,6 +485,30 @@ class MusicProvider {
   }
 
   /**
+   * Get Related Radio Tracks for Smart Autoplay (Infinite Radio)
+   */
+  async getRelatedRadioTracks(currentTrack, existingQueue = []) {
+    if (!currentTrack) return [];
+    const existingIds = new Set(existingQueue.map(t => (t.id || t.title || '').toLowerCase()));
+
+    const cleanArtist = (currentTrack.artist || '').split(/[,&•]/)[0].trim();
+    const query = cleanArtist && cleanArtist !== 'Artist' ? `${cleanArtist} hits` : `${currentTrack.title} radio`;
+
+    try {
+      const results = await this.search(query);
+      if (results && results.length > 0) {
+        const freshTracks = results.filter(t => !existingIds.has((t.id || '').toLowerCase()) && !existingIds.has((t.title || '').toLowerCase()));
+        return freshTracks.slice(0, 6);
+      }
+    } catch (e) {
+      console.warn('[MusicProvider] Radio discovery error:', e);
+    }
+
+    // Fallback: pick unplayed tracks from curated catalog
+    return this.curatedCatalogue.filter(t => !existingIds.has(t.id.toLowerCase())).slice(0, 4);
+  }
+
+  /**
    * Retrieve Synchronized Lyrics for Track
    */
   async getLyrics(track) {

@@ -1082,7 +1082,20 @@ class UIViewController {
 
     this.isScreensaverActive = true;
     fsPlayer.classList.add('cinema-screensaver');
+    this.updateScreensaverClock();
     console.log('[Screensaver] Cinema screensaver activated');
+  }
+
+  updateScreensaverClock() {
+    const clockEl = document.getElementById('screensaver-clock-text');
+    if (clockEl) {
+      const now = new Date();
+      let hours = now.getHours();
+      const mins = String(now.getMinutes()).padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12 || 12;
+      clockEl.textContent = `${hours}:${mins} ${ampm}`;
+    }
   }
 
   exitScreensaver() {

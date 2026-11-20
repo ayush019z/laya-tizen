@@ -7,7 +7,9 @@ class PlaybackQueue {
     this.currentIndex = -1;
     this.repeatMode = 'all'; // 'none', 'all', 'one'
     this.isShuffled = false;
+    this.autoplayEnabled = true; // Infinite Radio Mode
     this.listeners = [];
+    this._fetchingAutoplay = false;
   }
 
   onChange(callback) {
@@ -22,6 +24,7 @@ class PlaybackQueue {
     this.tracks = [...trackList];
     this.currentIndex = Math.max(0, Math.min(startIndex, this.tracks.length - 1));
     this.notify();
+    this.checkAndTriggerAutoplay();
   }
 
   getCurrentTrack() {
@@ -59,6 +62,11 @@ class PlaybackQueue {
   advance() {
     if (this.repeatMode === 'one') return this.getCurrentTrack();
 
+    // Infinite Radio Autoplay: When near the end of the queue, dynamically pull more related tracks
+    if (this.currentIndex >= this.tracks.length - 2 && this.autoplayEnabled) {
+      this.checkAndTriggerAutoplay();
+    }
+
     if (this.currentIndex + 1 < this.tracks.length) {
       this.currentIndex++;
     } else if (this.repeatMode === 'all') {
@@ -66,6 +74,31 @@ class PlaybackQueue {
     }
     this.notify();
     return this.getCurrentTrack();
+  }
+
+  async checkAndTriggerAutoplay() {
+    if (!this.autoplayEnabled || this._fetchingAutoplay) return;
+    const current = this.getCurrentTrack();
+    if (!current || !window.MusicProvider) return;
+
+    // Only fetch if 2 or fewer tracks remain ahead
+    if (this.tracks.length - this.currentIndex > 3) return;
+
+    this._fetchingAutoplay = true;
+    try {
+      const radioTracks = await window.MusicProvider.getRelatedRadioTracks(current, this.tracks);
+      if (radioTracks && radioTracks.length > 0) {
+        radioTracks.forEach(t => this.tracks.push(t));
+        this.notify();
+        if (window.UIController) {
+          window.UIController.showToast(`📻 Infinite Radio: Queued ${radioTracks.length} similar tracks`);
+        }
+      }
+    } catch (e) {
+      console.warn('[Queue] Infinite radio autoplay error:', e);
+    } finally {
+      this._fetchingAutoplay = false;
+    }
   }
 
   retreat() {

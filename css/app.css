@@ -1349,29 +1349,71 @@ html, body {
 }
 
 #fullscreen-player.cinema-screensaver .screensaver-floating-pill {
-  opacity: 0.6;
+  opacity: 0.85;
 }
 
 #fullscreen-player.cinema-screensaver .player-header-card,
 #fullscreen-player.cinema-screensaver .player-scrubber,
+#fullscreen-player.cinema-screensaver .player-btn-preview,
 #fullscreen-player.cinema-screensaver .player-controls-row,
 #fullscreen-player.cinema-screensaver .player-action-icons {
   opacity: 0;
   pointer-events: none;
   transform: translateY(20px);
+  transition: all 1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Retro Spinning Vinyl Record in Screensaver */
+#fullscreen-player.cinema-screensaver .player-art-frame {
+  width: 420px;
+  height: 420px;
+  border-radius: 50%;
+  border: 10px solid #101016;
+  box-shadow: 0 40px 100px rgba(0, 0, 0, 0.98), 0 0 80px var(--dynamic-glow);
+  position: relative;
+  overflow: hidden;
+  animation: spinVinyl 14s linear infinite;
   transition: all 1.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-#fullscreen-player.cinema-screensaver .player-art-frame {
-  transform: scale(1.08) translateY(-10px);
-  box-shadow: 0 40px 100px rgba(0, 0, 0, 0.98), 0 0 90px var(--dynamic-glow);
-  transition: all 1.5s cubic-bezier(0.16, 1, 0.3, 1);
+@keyframes spinVinyl {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+#fullscreen-player.cinema-screensaver .player-art-frame::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 36px;
+  height: 36px;
+  background: #09090e;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.95);
+  z-index: 10;
 }
 
 #fullscreen-player.cinema-screensaver .lyrics-stage {
-  font-size: 1.15em;
-  transform: scale(1.03);
+  gap: 46px;
+  padding: 120px 0 280px 0;
   transition: all 1.2s ease;
+}
+
+#fullscreen-player.cinema-screensaver .lrc-line {
+  font-size: 38px;
+  line-height: 1.5;
+  transition: all 0.35s ease;
+}
+
+#fullscreen-player.cinema-screensaver .lrc-line.active {
+  font-size: 56px;
+  font-weight: 800;
+  color: #ffffff;
+  transform: scale(1.08) translateX(16px);
+  text-shadow: 0 0 28px rgba(255, 255, 255, 0.8), 0 0 60px var(--dynamic-glow);
 }
 
 /* =====================================================================

@@ -98,6 +98,11 @@ class AudioController {
     if (window.Library) {
       window.Library.addHistory(track);
     }
+
+    // Trigger Infinite Radio autoplay if playing standalone track
+    if (window.Queue) {
+      window.Queue.checkAndTriggerAutoplay();
+    }
   }
 
   togglePlayPause() {
