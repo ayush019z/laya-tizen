@@ -397,19 +397,51 @@
     <div id="toast"></div>
   </div>
 
-  <!-- Scripts in Synchronous Dependency Order -->
-  <script src="js/lib/crypto-js.min.js"></script>
-  <script src="js/navigation/spatial-nav.js"></script>
-  <script src="js/navigation/remote-keys.js"></script>
-  <script src="js/player/audio-dsp.js"></script>
-  <script src="js/player/queue.js"></script>
-  <script src="js/player/audio-controller.js"></script>
-  <script src="js/providers/lyrics-service.js"></script>
-  <script src="js/providers/innertube.js"></script>
-  <script src="js/ui/palette-extractor.js"></script>
-  <script src="js/ui/qr-generator.js"></script>
-  <script src="js/ui/library.js"></script>
-  <script src="js/updater.js"></script>
-  <script src="js/ui/views.js"></script>
+  <!-- Dynamic OTA Hot-Reload Script Bootloader (Preserves Sequential Dependency Loading) -->
+  <script>
+    (function() {
+      var scripts = [
+        "js/lib/crypto-js.min.js",
+        "js/navigation/spatial-nav.js",
+        "js/navigation/remote-keys.js",
+        "js/player/audio-dsp.js",
+        "js/player/queue.js",
+        "js/player/audio-controller.js",
+        "js/providers/lyrics-service.js",
+        "js/providers/innertube.js",
+        "js/ui/palette-extractor.js",
+        "js/ui/qr-generator.js",
+        "js/ui/library.js",
+        "js/updater.js",
+        "js/ui/views.js"
+      ];
+
+      function loadNext(index) {
+        if (index >= scripts.length) return;
+        var src = scripts[index];
+        var cached = null;
+        try {
+          cached = localStorage.getItem('layatv_ota_file_' + src);
+        } catch(e) {}
+
+        var s = document.createElement('script');
+        if (cached && cached.trim().length > 0) {
+          s.textContent = cached;
+          document.body.appendChild(s);
+          loadNext(index + 1);
+        } else {
+          s.src = src;
+          s.onload = function() { loadNext(index + 1); };
+          s.onerror = function() {
+            console.warn('[Bootloader] Error loading', src, 'continuing...');
+            loadNext(index + 1);
+          };
+          document.body.appendChild(s);
+        }
+      }
+
+      loadNext(0);
+    })();
+  </script>
 </body>
 </html>

@@ -1,17 +1,21 @@
 {
-  "version": "1.1.1",
-  "build": 103,
+  "version": "1.2.0",
+  "build": 105,
   "releaseDate": "2026-11-21",
   "minTizenVersion": "3.0",
-  "updateUrl": "https://raw.githubusercontent.com/impin2rex/laya-tizen-web/main/version.json",
-  "bundleBaseUrl": "https://raw.githubusercontent.com/impin2rex/laya-tizen-web/main/",
-  "changelog": "Clean home discovery shelves, moved audio DSP & stats to Settings view, removed sleep timer, fixed synchronous script bootloader and navigation.",
+  "updateUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/version.json",
+  "bundleBaseUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/",
+  "changelog": "Bollywood Arijit Singh catalog, JioSaavn full-track 320k streaming, restored TV hardware remote volume, zero-lag lyrics rendering, and full OTA live-patching bootloader.",
   "files": [
     "css/app.css",
+    "js/lib/crypto-js.min.js",
+    "js/navigation/remote-keys.js",
+    "js/navigation/spatial-nav.js",
     "js/player/audio-dsp.js",
     "js/player/audio-controller.js",
+    "js/providers/lyrics-service.js",
     "js/providers/innertube.js",
     "js/ui/views.js",
-    "index.html"
+    "version.json"
   ]
 }
