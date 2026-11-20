@@ -208,9 +208,31 @@ class AudioDSPEngine {
     // Merge Dry + Wet into Master Gain -> Destination
     this.reverbDryGain.connect(this.masterGain);
     this.reverbWetGain.connect(this.masterGain);
+
+    // 5. Connect Analyser Node for Real-Time Floating Audio Visualizer
+    this.analyser = this.ctx.createAnalyser();
+    this.analyser.fftSize = 64; // 32 frequency bins - optimal lightweight TV sampling
+    this.analyser.smoothingTimeConstant = 0.82;
+    this.analyserData = new Uint8Array(this.analyser.frequencyBinCount);
+    this.masterGain.connect(this.analyser);
+
     this.masterGain.connect(this.ctx.destination);
 
     this.updateStats();
+  }
+
+  getFrequencyData() {
+    if (!this.analyser || !this.analyserData) return null;
+    this.analyser.getByteFrequencyData(this.analyserData);
+    return this.analyserData;
+  }
+
+  crossfadeToGain(targetGain, durationSec = 3) {
+    if (!this.ctx || !this.masterGain) return;
+    const now = this.ctx.currentTime;
+    this.masterGain.gain.cancelScheduledValues(now);
+    this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, now);
+    this.masterGain.gain.linearRampToValueAtTime(targetGain, now + durationSec);
   }
 
   // --- 5-Band Equalizer Controls ---

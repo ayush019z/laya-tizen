@@ -10,6 +10,8 @@ class AudioController {
     this.currentTrack = null;
     this.currentLyrics = [];
     this.activeLyricIndex = -1;
+    this.crossfadeDuration = 4; // seconds (DJ Crossfade)
+    this.isCrossfading = false;
 
     this.setupAudioListeners();
   }
@@ -190,6 +192,30 @@ class AudioController {
     if (window.UIController && this.currentLyrics && this.currentLyrics.length > 0) {
       window.UIController.updateWordLyrics(this.currentLyrics, current);
     }
+
+    // Seamless DJ Crossfade Trigger
+    if (this.crossfadeDuration > 0 && !this.isCrossfading && this.audio.duration > 20) {
+      const timeLeft = this.audio.duration - current;
+      if (timeLeft > 0 && timeLeft <= this.crossfadeDuration && window.Queue && window.Queue.hasNext()) {
+        this.triggerCrossfade();
+      }
+    }
+  }
+
+  triggerCrossfade() {
+    this.isCrossfading = true;
+    if (window.AudioDSP) {
+      window.AudioDSP.crossfadeToGain(0.08, this.crossfadeDuration);
+    }
+    setTimeout(() => {
+      this.playNext();
+      if (window.AudioDSP) {
+        window.AudioDSP.crossfadeToGain(1.0, 1.8);
+      }
+      setTimeout(() => {
+        this.isCrossfading = false;
+      }, 2000);
+    }, (this.crossfadeDuration - 0.4) * 1000);
   }
 
   formatTime(sec) {

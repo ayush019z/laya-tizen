@@ -31,6 +31,8 @@ class UIViewController {
     this.setupPartyJukebox();
     this.setupScreensaver();
     this.setupKaraokeStage();
+    this.setupVisualizer();
+    this.setupDualScriptToggle();
     this.renderHome();
     this.renderVirtualKeyboard();
   }
@@ -160,27 +162,57 @@ class UIViewController {
       const trackContainer = document.createElement('div');
       trackContainer.className = 'shelf-track-container';
 
-      shelf.items.forEach(track => {
-        const card = document.createElement('div');
-        card.className = 'media-card focusable';
-        card.setAttribute('tabindex', '0');
+      if (shelf.isMixShelf) {
+        shelf.items.forEach(mix => {
+          const card = document.createElement('div');
+          card.className = 'shelf-mix-card focusable';
+          card.setAttribute('tabindex', '0');
+          card.setAttribute('data-focus-name', mix.title);
+          card.style.background = mix.gradient;
 
-        card.innerHTML = `
-          <div class="media-card-artwork">
-            <img src="${track.artwork}" alt="${track.title}" loading="lazy"/>
-          </div>
-          <div class="media-card-title">${track.title}</div>
-          <div class="media-card-author">${track.artist}</div>
-        `;
+          card.innerHTML = `
+            <div class="mix-card-badge">${mix.badge}</div>
+            <div>
+              <div class="mix-card-title">${mix.title}</div>
+              <div class="mix-card-sub">${mix.subtitle}</div>
+            </div>
+          `;
 
-        card.addEventListener('click', () => {
-          window.Queue.setQueue(shelf.items, shelf.items.indexOf(track));
-          window.AudioPlayer.playTrack(track);
-          this.openFullscreenPlayer();
+          card.addEventListener('click', async () => {
+            this.showToast(`Launching ${mix.title}...`);
+            const tracks = await window.MusicProvider.search(mix.query);
+            if (tracks && tracks.length > 0) {
+              window.Queue.setQueue(tracks, 0);
+              window.AudioPlayer.playTrack(tracks[0]);
+              this.openFullscreenPlayer();
+            }
+          });
+
+          trackContainer.appendChild(card);
         });
+      } else {
+        shelf.items.forEach(track => {
+          const card = document.createElement('div');
+          card.className = 'media-card focusable';
+          card.setAttribute('tabindex', '0');
 
-        trackContainer.appendChild(card);
-      });
+          card.innerHTML = `
+            <div class="media-card-artwork">
+              <img src="${track.artwork}" alt="${track.title}" loading="lazy"/>
+            </div>
+            <div class="media-card-title">${track.title}</div>
+            <div class="media-card-author">${track.artist}</div>
+          `;
+
+          card.addEventListener('click', () => {
+            window.Queue.setQueue(shelf.items, shelf.items.indexOf(track));
+            window.AudioPlayer.playTrack(track);
+            this.openFullscreenPlayer();
+          });
+
+          trackContainer.appendChild(card);
+        });
+      }
 
       shelfElem.appendChild(trackContainer);
       container.appendChild(shelfElem);
@@ -638,6 +670,22 @@ class UIViewController {
       });
     }
 
+    // Visualizer Toggle Button
+    const vizBtn = document.getElementById('btn-toggle-visualizer');
+    if (vizBtn) {
+      vizBtn.addEventListener('click', () => {
+        this.toggleVisualizer();
+      });
+    }
+
+    // Dual-Script Toggle Button
+    const dualLyricsBtn = document.getElementById('btn-toggle-dual-lyrics');
+    if (dualLyricsBtn) {
+      dualLyricsBtn.addEventListener('click', () => {
+        this.toggleDualLyrics();
+      });
+    }
+
     // Karaoke Sing-Along Stage Button
     const karaokeBtn = document.getElementById('btn-karaoke-stage');
     if (karaokeBtn) {
@@ -674,6 +722,8 @@ class UIViewController {
       'fs-shuffle-btn': 'Shuffle',
       'fs-repeat-btn': 'Repeat',
       'btn-karaoke-stage': 'Vocals Mode',
+      'btn-toggle-visualizer': 'Visualizer',
+      'btn-toggle-dual-lyrics': 'Dual Script',
       'btn-party-jukebox': 'Party Jukebox',
       'btn-fav-track': 'Favorite',
       'btn-toggle-queue': 'Queue',
@@ -722,6 +772,137 @@ class UIViewController {
 
       list.appendChild(row);
     });
+  }
+
+  // --- Audio Visualizer & Dual Script Controllers ---
+  setupVisualizer() {
+    this.visualizerCanvas = document.getElementById('player-visualizer-canvas');
+    if (this.visualizerCanvas) {
+      this.visualizerCtx = this.visualizerCanvas.getContext('2d');
+    }
+    this.isVisualizerActive = false;
+  }
+
+  toggleVisualizer() {
+    this.isVisualizerActive = !this.isVisualizerActive;
+    const btn = document.getElementById('btn-toggle-visualizer');
+    if (btn) btn.classList.toggle('active', this.isVisualizerActive);
+    if (this.visualizerCanvas) this.visualizerCanvas.classList.toggle('active', this.isVisualizerActive);
+
+    if (this.isVisualizerActive) {
+      this.showToast('Audio Visualizer Activated');
+      this.runVisualizerLoop();
+    } else {
+      this.showToast('Visualizer Hidden');
+    }
+  }
+
+  runVisualizerLoop() {
+    if (!this.isVisualizerActive) return;
+
+    const draw = () => {
+      if (!this.isVisualizerActive) return;
+
+      const fsPlayer = document.getElementById('fullscreen-player');
+      if (!fsPlayer || !fsPlayer.classList.contains('active')) {
+        requestAnimationFrame(draw);
+        return;
+      }
+
+      const ctx = this.visualizerCtx;
+      const canvas = this.visualizerCanvas;
+      if (!ctx || !canvas) return;
+
+      const data = window.AudioDSP ? window.AudioDSP.getFrequencyData() : null;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (data && data.length > 0 && window.AudioPlayer && window.AudioPlayer.isPlaying) {
+        const bars = 20;
+        const barWidth = 12;
+        const spacing = (canvas.width - (bars * barWidth)) / (bars + 1);
+        const centerY = canvas.height / 2;
+
+        for (let i = 0; i < bars; i++) {
+          const val = data[i] || 0;
+          const barHeight = Math.max(8, (val / 255) * 160);
+          const x = spacing + i * (barWidth + spacing);
+          const y = centerY - barHeight / 2;
+
+          const grad = ctx.createLinearGradient(0, y, 0, y + barHeight);
+          grad.addColorStop(0, '#ffffff');
+          grad.addColorStop(0.5, '#ff2a6d');
+          grad.addColorStop(1, '#8a2387');
+
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          if (ctx.roundRect) {
+            ctx.roundRect(x, y, barWidth, barHeight, 5);
+          } else {
+            ctx.rect(x, y, barWidth, barHeight);
+          }
+          ctx.fill();
+        }
+      }
+
+      requestAnimationFrame(draw);
+    };
+
+    requestAnimationFrame(draw);
+  }
+
+  setupDualScriptToggle() {
+    this.isDualScriptActive = false;
+  }
+
+  toggleDualLyrics() {
+    this.isDualScriptActive = !this.isDualScriptActive;
+    const btn = document.getElementById('btn-toggle-dual-lyrics');
+    if (btn) btn.classList.toggle('active', this.isDualScriptActive);
+    this.showToast(this.isDualScriptActive ? 'Dual-Script Sing-Along Active' : 'Standard Lyrics View');
+    this.renderLyrics(window.AudioPlayer?.currentLyrics || []);
+  }
+
+  transliterateDevanagariToLatin(text) {
+    if (!text) return '';
+    if (!/[\u0900-\u097F]/.test(text)) return '';
+
+    const vowels = {
+      'अ': 'a', 'आ': 'aa', 'इ': 'i', 'ई': 'ee', 'उ': 'u', 'ऊ': 'oo', 'ऋ': 'ri',
+      'ए': 'e', 'ऐ': 'ai', 'ओ': 'o', 'औ': 'au', 'अं': 'am', 'अः': 'ah',
+      'ा': 'aa', 'ि': 'i', 'ी': 'ee', 'ु': 'u', 'ू': 'oo', 'ृ': 'ri',
+      'े': 'e', 'ै': 'ai', 'ो': 'o', 'ौ': 'au', 'ं': 'n', 'ँ': 'n', 'ः': 'h', '्': ''
+    };
+
+    const consonants = {
+      'क': 'k', 'ख': 'kh', 'ग': 'g', 'घ': 'gh', 'ङ': 'ng',
+      'च': 'ch', 'छ': 'chh', 'ज': 'j', 'झ': 'jh', 'ञ': 'ny',
+      'ट': 't', 'ठ': 'th', 'ड': 'd', 'ढ': 'dh', 'ण': 'n',
+      'त': 't', 'थ': 'th', 'द': 'd', 'ध': 'dh', 'न': 'n',
+      'प': 'p', 'फ': 'ph', 'ब': 'b', 'भ': 'bh', 'म': 'm',
+      'य': 'y', 'र': 'r', 'ल': 'l', 'व': 'v',
+      'श': 'sh', 'ष': 'sh', 'स': 's', 'ह': 'h',
+      'ड़': 'r', 'ढ़': 'rh', 'फ़': 'f', 'ज़': 'z', 'क़': 'q', 'ख़': 'kh', 'ग़': 'gh'
+    };
+
+    let result = '';
+    const chars = Array.from(text);
+    for (let i = 0; i < chars.length; i++) {
+      const ch = chars[i];
+      if (consonants[ch]) {
+        result += consonants[ch];
+        const next = chars[i + 1];
+        if (!next || (!vowels[next] && next !== '्' && !consonants[next])) {
+          result += 'a';
+        } else if (consonants[next]) {
+          result += 'a';
+        }
+      } else if (vowels[ch]) {
+        result += vowels[ch];
+      } else {
+        result += ch;
+      }
+    }
+    return result.replace(/\s+/g, ' ').trim();
   }
 
   // --- 6. Apple-Style Word-Synced Lyrics Renderer (am-lyrics) ---
@@ -862,6 +1043,17 @@ class UIViewController {
           const textNode = document.createTextNode(line.text);
           lineElem.appendChild(textNode);
         }
+
+        // Dual-Script / Romanized sing-along subtitle if toggled on
+        if (this.isDualScriptActive && line.text) {
+          const romanized = this.transliterateDevanagariToLatin(line.text);
+          if (romanized) {
+            const dualDiv = document.createElement('div');
+            dualDiv.className = 'lrc-dual-script';
+            dualDiv.textContent = romanized;
+            lineElem.appendChild(dualDiv);
+          }
+        }
       }
 
       lineElem.addEventListener('click', () => {
@@ -887,39 +1079,78 @@ class UIViewController {
       }
     }
 
-    // Only touch the DOM when the active line actually changes (prevents massive 60fps DOM thrashing)
-    if (this.activeLyricIndex === activeLineIdx) {
-      return;
-    }
-
-    const prevIdx = this.activeLyricIndex;
-    this.activeLyricIndex = activeLineIdx;
-
     const container = document.getElementById('lyrics-container');
     if (!container) return;
 
-    if (prevIdx !== -1) {
-      const prevLine = container.querySelector(`.lrc-line[data-line="${prevIdx}"]`);
-      if (prevLine) prevLine.classList.remove('active');
+    if (this.activeLyricIndex !== activeLineIdx) {
+      const prevIdx = this.activeLyricIndex;
+      this.activeLyricIndex = activeLineIdx;
+
+      if (prevIdx !== -1) {
+        const prevLine = container.querySelector(`.lrc-line[data-line="${prevIdx}"]`);
+        if (prevLine) {
+          prevLine.classList.remove('active');
+          const oldBall = prevLine.querySelector('.vocal-sing-ball');
+          if (oldBall) oldBall.remove();
+        }
+      }
+
+      if (activeLineIdx !== -1) {
+        const currLine = container.querySelector(`.lrc-line[data-line="${activeLineIdx}"]`);
+        if (currLine) {
+          currLine.classList.add('active');
+
+          // Apple Music stepped visual depth
+          container.querySelectorAll('.lrc-line.nearby').forEach(el => el.classList.remove('nearby'));
+          const nextLine = container.querySelector(`.lrc-line[data-line="${activeLineIdx + 1}"]`);
+          const prevAdjacent = container.querySelector(`.lrc-line[data-line="${activeLineIdx - 1}"]`);
+          if (nextLine) nextLine.classList.add('nearby');
+          if (prevAdjacent) prevAdjacent.classList.add('nearby');
+
+          // Attach Apple Music Sing Bouncing Rhythm Guide Ball if Vocals/Karaoke active
+          const isKaraoke = this.isKaraokeActive || (window.AudioDSP && window.AudioDSP.karaokeEnabled);
+          if (isKaraoke && !currLine.querySelector('.vocal-sing-ball') && !currLine.classList.contains('lrc-instrumental')) {
+            const ball = document.createElement('div');
+            ball.className = 'vocal-sing-ball';
+            currLine.appendChild(ball);
+          }
+
+          // 60fps GPU Hardware-Accelerated Smooth Scroll
+          const scrollTrack = document.getElementById('lyrics-scroll-track');
+          if (scrollTrack) {
+            const targetY = -Math.max(0, currLine.offsetTop - 140);
+            scrollTrack.style.transform = `translate3d(0, ${targetY}px, 0)`;
+          }
+        }
+      }
     }
 
+    // Dynamic Syllable / Word Pacing Guide for active line
     if (activeLineIdx !== -1) {
       const currLine = container.querySelector(`.lrc-line[data-line="${activeLineIdx}"]`);
-      if (currLine) {
-        currLine.classList.add('active');
-
-        // Apple Music stepped visual depth
-        container.querySelectorAll('.lrc-line.nearby').forEach(el => el.classList.remove('nearby'));
-        const nextLine = container.querySelector(`.lrc-line[data-line="${activeLineIdx + 1}"]`);
-        const prevAdjacent = container.querySelector(`.lrc-line[data-line="${activeLineIdx - 1}"]`);
-        if (nextLine) nextLine.classList.add('nearby');
-        if (prevAdjacent) prevAdjacent.classList.add('nearby');
-
-        // 60fps GPU Hardware-Accelerated Smooth Scroll
-        const scrollTrack = document.getElementById('lyrics-scroll-track');
-        if (scrollTrack) {
-          const targetY = -Math.max(0, currLine.offsetTop - 140);
-          scrollTrack.style.transform = `translate3d(0, ${targetY}px, 0)`;
+      if (currLine && !currLine.classList.contains('lrc-instrumental')) {
+        const ball = currLine.querySelector('.vocal-sing-ball');
+        const words = currLine.querySelectorAll('.lrc-word');
+        if (words && words.length > 0) {
+          let activeWordEl = null;
+          words.forEach(w => {
+            const wTime = parseFloat(w.getAttribute('data-word-time') || 0);
+            if (currentTime >= wTime) {
+              w.classList.add('sung');
+              activeWordEl = w;
+            } else {
+              w.classList.remove('sung');
+            }
+          });
+          if (ball && activeWordEl) {
+            ball.style.left = (activeWordEl.offsetLeft + activeWordEl.offsetWidth / 2 - 7) + 'px';
+          }
+        } else if (ball) {
+          const currTime = lyrics[activeLineIdx].time;
+          const nextTime = lyrics[activeLineIdx + 1] ? lyrics[activeLineIdx + 1].time : currTime + 4.0;
+          const duration = Math.max(0.8, nextTime - currTime);
+          const progress = Math.min(1, Math.max(0, (currentTime - currTime) / duration));
+          ball.style.left = Math.round(progress * Math.min(currLine.offsetWidth, 480)) + 'px';
         }
       }
     }
@@ -1246,6 +1477,7 @@ class UIViewController {
       }
     } else {
       fsPlayer.classList.remove('karaoke-stage-active');
+      document.querySelectorAll('.vocal-sing-ball').forEach(b => b.remove());
       this.showToast('Vocals Mode Turned Off');
     }
   }

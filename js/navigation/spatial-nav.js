@@ -70,6 +70,8 @@ class SpatialNavigator {
 
     const nameMap = {
       'btn-karaoke-stage': 'Vocals Mode',
+      'btn-toggle-visualizer': 'Visualizer',
+      'btn-toggle-dual-lyrics': 'Dual Script',
       'btn-party-jukebox': 'Party Jukebox',
       'btn-fav-track': 'Favorite',
       'btn-toggle-queue': 'Queue',

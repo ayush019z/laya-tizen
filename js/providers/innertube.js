@@ -218,6 +218,58 @@ class MusicProvider {
     return [
       algoShelf,
       {
+        title: 'Instant Artist & Mood Mixes',
+        subtitle: 'One-click endless radio stations',
+        isMixShelf: true,
+        items: [
+          {
+            id: 'mix_arijit',
+            isMix: true,
+            title: 'Arijit Singh & Similar',
+            subtitle: 'Soulful Bollywood Melodies',
+            badge: '📻 ARTIST RADIO',
+            gradient: 'linear-gradient(135deg, #ff416c, #8a2387)',
+            query: 'Arijit Singh hits'
+          },
+          {
+            id: 'mix_2010s',
+            isMix: true,
+            title: '2010s Golden Era',
+            subtitle: 'Mohit Chauhan, Atif, Shreya',
+            badge: '🌆 NOSTALGIA',
+            gradient: 'linear-gradient(135deg, #4776e6, #8e54e9)',
+            query: '2010s bollywood hindi romantic hits'
+          },
+          {
+            id: 'mix_punjabi',
+            isMix: true,
+            title: 'High-Octane Punjabi',
+            subtitle: 'Diljit, AP Dhillon, Karan Aujla',
+            badge: '⚡ ENERGETIC',
+            gradient: 'linear-gradient(135deg, #f12711, #f5af19)',
+            query: 'punjabi hits diljit ap dhillon'
+          },
+          {
+            id: 'mix_romantic_duets',
+            isMix: true,
+            title: 'Soulful Duets',
+            subtitle: 'Arijit, Shreya, Alka, Sonu',
+            badge: '💖 ROMANTIC',
+            gradient: 'linear-gradient(135deg, #eaafc8, #654ea3)',
+            query: 'romantic duet hindi songs'
+          },
+          {
+            id: 'mix_lofi',
+            isMix: true,
+            title: 'Midnight Drive Lo-Fi',
+            subtitle: 'Acoustic & Chilled Beats',
+            badge: '🌙 CHILL',
+            gradient: 'linear-gradient(135deg, #11998e, #38ef7d)',
+            query: 'hindi lofi chill songs'
+          }
+        ]
+      },
+      {
         title: 'Trending Bollywood Hits',
         subtitle: 'Most played Hindi songs on Laya',
         items: [
