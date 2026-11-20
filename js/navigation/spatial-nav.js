@@ -50,7 +50,7 @@ class SpatialNavigator {
     }
     this.currentFocus = element;
     element.classList.add('focused');
-    element.focus();
+    try { element.focus(); } catch (e) {}
     
     // Ensure element is visible in view
     element.scrollIntoView({
@@ -58,6 +58,73 @@ class SpatialNavigator {
       block: 'nearest',
       inline: 'nearest'
     });
+
+    this.showButtonFocusLabel(element);
+  }
+
+  showButtonFocusLabel(element) {
+    if (!element) return;
+    let label = element.getAttribute('data-focus-name') ||
+                element.getAttribute('data-name') ||
+                element.getAttribute('title');
+
+    const nameMap = {
+      'btn-karaoke-stage': 'Vocals Mode',
+      'btn-party-jukebox': 'Party Jukebox',
+      'btn-fav-track': 'Favorite',
+      'btn-toggle-queue': 'Queue',
+      'btn-player-settings': 'Audio FX',
+      'fs-shuffle-btn': 'Shuffle',
+      'fs-prev-btn': 'Previous',
+      'fs-play-pause-btn': (window.AudioPlayer && window.AudioPlayer.isPlaying) ? 'Pause' : 'Play',
+      'fs-next-btn': 'Next',
+      'fs-repeat-btn': 'Repeat',
+      'player-scrubber-track': 'Seek',
+      'btn-exit-karaoke': 'Exit Vocals Mode',
+      'mini-play-pause-btn': (window.AudioPlayer && window.AudioPlayer.isPlaying) ? 'Pause' : 'Play',
+      'mini-next-btn': 'Next',
+      'btn-voice-search': 'Voice Search',
+      'btn-clear-query': 'Clear',
+      'btn-dock-search': 'Search'
+    };
+
+    if (!label && nameMap[element.id]) {
+      label = nameMap[element.id];
+    }
+
+    // 1. Update the fixed pill on player screen
+    const previewBadge = document.getElementById('player-btn-preview');
+    if (previewBadge) {
+      const actionText = previewBadge.querySelector('.preview-badge-action');
+      if (label && (element.closest('#fullscreen-player') || element.closest('.player-header-card') || element.closest('.player-controls-row'))) {
+        if (actionText) actionText.textContent = label;
+        previewBadge.classList.add('visible');
+      } else {
+        previewBadge.classList.remove('visible');
+      }
+    }
+
+    // 2. High-contrast floating pill directly near the focused button
+    let floatingTooltip = document.getElementById('tv-focus-tooltip');
+    if (!floatingTooltip) {
+      floatingTooltip = document.createElement('div');
+      floatingTooltip.id = 'tv-focus-tooltip';
+      floatingTooltip.className = 'tv-focus-tooltip';
+      document.body.appendChild(floatingTooltip);
+    }
+
+    if (label) {
+      floatingTooltip.textContent = label;
+      const rect = element.getBoundingClientRect();
+      const isTop = rect.top < 80;
+      const topOffset = isTop ? (rect.bottom + 10) : (rect.top - 12);
+      const transformClass = isTop ? 'tooltip-below' : 'tooltip-above';
+      floatingTooltip.style.left = Math.round(rect.left + rect.width / 2) + 'px';
+      floatingTooltip.style.top = Math.round(topOffset) + 'px';
+      floatingTooltip.className = 'tv-focus-tooltip active ' + transformClass;
+    } else {
+      floatingTooltip.className = 'tv-focus-tooltip';
+    }
   }
 
   validateFocus() {

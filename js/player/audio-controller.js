@@ -51,9 +51,8 @@ class AudioController {
       window.PaletteExtractor.extractAndApply(track.artwork);
     }
 
-    // 2. Attach Web Audio DSP Engine ONLY if user enabled Reverb or Karaoke
-    // Otherwise keep native TV hardware audio decoding (0% CPU load)
-    if (window.AudioDSP && (window.AudioDSP.reverbPreset !== 'off' || window.UIController?.isKaraokeActive)) {
+    // 2. Attach Web Audio DSP Engine for instant Vocals Mode & Reverb
+    if (window.AudioDSP) {
       window.AudioDSP.attachAudioElement(this.audio);
     }
 

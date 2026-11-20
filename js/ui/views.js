@@ -682,26 +682,15 @@ class UIViewController {
       'btn-exit-karaoke': 'Exit Vocals Mode'
     };
 
-    const previewBadge = document.getElementById('player-btn-preview');
-    if (!previewBadge) return;
-
-    const actionText = previewBadge.querySelector('.preview-badge-action');
-
-    const updateBadge = (name) => {
-      if (actionText) actionText.textContent = name;
-      previewBadge.classList.add('visible');
-    };
-
-    const resetBadge = () => {
-      previewBadge.classList.remove('visible');
-    };
-
     Object.keys(previewMap).forEach(btnId => {
       const btn = document.getElementById(btnId);
       if (btn) {
-        btn.addEventListener('focus', () => updateBadge(previewMap[btnId]));
-        btn.addEventListener('mouseenter', () => updateBadge(previewMap[btnId]));
-        btn.addEventListener('blur', resetBadge);
+        btn.addEventListener('focus', () => {
+          if (window.SpatialNav) window.SpatialNav.showButtonFocusLabel(btn);
+        });
+        btn.addEventListener('mouseenter', () => {
+          if (window.SpatialNav) window.SpatialNav.showButtonFocusLabel(btn);
+        });
       }
     });
   }
@@ -736,6 +725,38 @@ class UIViewController {
   }
 
   // --- 6. Apple-Style Word-Synced Lyrics Renderer (am-lyrics) ---
+  processLyricsWithInstrumentals(rawLyrics) {
+    if (!rawLyrics || rawLyrics.length === 0) return [];
+    const processed = [];
+
+    // 1. Intro Instrumental: if first line starts after 4.0 seconds
+    if (rawLyrics[0].time > 4.0) {
+      processed.push({
+        time: 0,
+        isInstrumental: true,
+        text: '🎶 🎶 🎶'
+      });
+    }
+
+    for (let i = 0; i < rawLyrics.length; i++) {
+      processed.push(rawLyrics[i]);
+
+      // 2. Interlude Instrumental: if gap between lines > 6.0 seconds
+      if (i < rawLyrics.length - 1) {
+        const gap = rawLyrics[i + 1].time - rawLyrics[i].time;
+        if (gap > 6.0) {
+          processed.push({
+            time: rawLyrics[i].time + 3.2,
+            isInstrumental: true,
+            text: '🎶 🎶 🎶'
+          });
+        }
+      }
+    }
+
+    return processed;
+  }
+
   renderLyrics(lyrics) {
     const container = document.getElementById('lyrics-container');
     if (!container) return;
@@ -745,32 +766,56 @@ class UIViewController {
       return;
     }
 
+    // Process lyrics to insert Apple Music style instrumental interludes
+    const processedLyrics = this.processLyricsWithInstrumentals(lyrics);
+    if (window.AudioPlayer) {
+      window.AudioPlayer.currentLyrics = processedLyrics;
+    }
+    this.activeLyricIndex = -1;
+
     container.innerHTML = '';
-    lyrics.forEach((line, lineIdx) => {
+    const scrollTrack = document.createElement('div');
+    scrollTrack.id = 'lyrics-scroll-track';
+    scrollTrack.className = 'lyrics-scroll-track';
+
+    processedLyrics.forEach((line, lineIdx) => {
       const lineElem = document.createElement('div');
-      lineElem.className = 'lrc-line focusable';
       lineElem.setAttribute('tabindex', '0');
       lineElem.setAttribute('data-line', lineIdx);
 
-      // Render each word
-      if (line.words && line.words.length > 0) {
-        line.words.forEach((w, wordIdx) => {
-          const wordSpan = document.createElement('span');
-          wordSpan.className = 'lrc-word';
-          wordSpan.setAttribute('data-word-time', w.time);
-          wordSpan.textContent = w.text;
-          lineElem.appendChild(wordSpan);
-        });
+      if (line.isInstrumental) {
+        lineElem.className = 'lrc-line lrc-instrumental focusable';
+        lineElem.innerHTML = `
+          <div class="instrumental-capsule">
+            <span class="note-dot note-1">🎶</span>
+            <span class="note-dot note-2">🎶</span>
+            <span class="note-dot note-3">🎶</span>
+          </div>
+        `;
       } else {
-        lineElem.textContent = line.text;
+        lineElem.className = 'lrc-line focusable';
+        // Render each word
+        if (line.words && line.words.length > 0) {
+          line.words.forEach((w) => {
+            const wordSpan = document.createElement('span');
+            wordSpan.className = 'lrc-word';
+            wordSpan.setAttribute('data-word-time', w.time);
+            wordSpan.textContent = w.text;
+            lineElem.appendChild(wordSpan);
+          });
+        } else {
+          lineElem.textContent = line.text;
+        }
       }
 
       lineElem.addEventListener('click', () => {
-        window.AudioPlayer.seek(line.time);
+        if (window.AudioPlayer) window.AudioPlayer.seek(line.time);
       });
 
-      container.appendChild(lineElem);
+      scrollTrack.appendChild(lineElem);
     });
+
+    container.appendChild(scrollTrack);
   }
 
   updateWordLyrics(lyrics, currentTime) {
@@ -814,14 +859,12 @@ class UIViewController {
         if (nextLine) nextLine.classList.add('nearby');
         if (prevAdjacent) prevAdjacent.classList.add('nearby');
 
-        // High-performance smooth scroll
-        const containerH = container.clientHeight || 500;
-        const lineTop = currLine.offsetTop;
-        const lineH = currLine.clientHeight || 60;
-        container.scrollTo({
-          top: Math.max(0, lineTop - (containerH / 2) + (lineH / 2)),
-          behavior: 'smooth'
-        });
+        // 60fps GPU Hardware-Accelerated Smooth Scroll
+        const scrollTrack = document.getElementById('lyrics-scroll-track');
+        if (scrollTrack) {
+          const targetY = -Math.max(0, currLine.offsetTop - 140);
+          scrollTrack.style.transform = `translate3d(0, ${targetY}px, 0)`;
+        }
       }
     }
   }
@@ -1130,11 +1173,16 @@ class UIViewController {
       }
     }
 
+    const karaokeBtn = document.getElementById('btn-karaoke-stage');
+    if (karaokeBtn) {
+      karaokeBtn.classList.toggle('active', this.isKaraokeActive);
+    }
+
     if (this.isKaraokeActive) {
       // Exit screensaver if active
       this.exitScreensaver();
       fsPlayer.classList.add('karaoke-stage-active');
-      this.showToast('🎤 Karaoke Stage Active: Vocals Reduced & Full-Screen Lyrics!');
+      this.showToast('🎤 Vocals Mode Active: Vocals Reduced & Full-Screen Lyrics!');
       
       const exitBtn = document.getElementById('btn-exit-karaoke');
       if (exitBtn && window.SpatialNav) {
@@ -1142,7 +1190,7 @@ class UIViewController {
       }
     } else {
       fsPlayer.classList.remove('karaoke-stage-active');
-      this.showToast('Karaoke Stage Closed');
+      this.showToast('Vocals Mode Turned Off');
     }
   }
 

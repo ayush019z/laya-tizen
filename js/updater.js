@@ -6,8 +6,8 @@
  */
 class AppUpdater {
   constructor() {
-    this.currentVersion = '1.3.1';
-    this.currentBuild = 115;
+    this.currentVersion = '1.3.2';
+    this.currentBuild = 120;
     this.defaultUpdateUrl = 'https://raw.githubusercontent.com/ayush019z/laya-tizen/main/version.json';
     this.updateUrl = localStorage.getItem('layatv_ota_url') || this.defaultUpdateUrl;
     this.isAutoUpdateEnabled = localStorage.getItem('layatv_ota_autocheck') !== 'false';

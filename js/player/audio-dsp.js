@@ -96,7 +96,7 @@ class AudioDSPEngine {
       return filter;
     });
 
-    // 2. Build Karaoke Center-Channel Vocal Subtraction Network (L - R)
+    // 2. Build Advanced Karaoke Vocal Cancellation & Formant Notch Network
     this.karaokeSplitter = this.ctx.createChannelSplitter(2);
     this.vocalL = this.ctx.createGain();
     this.vocalL.gain.value = 1.0;
@@ -108,13 +108,58 @@ class AudioDSPEngine {
     this.vocalL.connect(this.vocalSubtractor);
     this.vocalR.connect(this.vocalSubtractor);
 
-    // Bass Retention Filter (180 Hz Lowpass) to preserve beat, kick drums and bassline
+    // Deep Vocal Formant Notch Bank (eliminates vocal reverb, stereo chorus and harmonic bleed)
+    const notch1 = this.ctx.createBiquadFilter();
+    notch1.type = 'notch';
+    notch1.frequency.value = 1000;
+    notch1.Q.value = 2.0;
+
+    const notch2 = this.ctx.createBiquadFilter();
+    notch2.type = 'notch';
+    notch2.frequency.value = 2500;
+    notch2.Q.value = 2.2;
+
+    const notch3 = this.ctx.createBiquadFilter();
+    notch3.type = 'peaking';
+    notch3.frequency.value = 500;
+    notch3.Q.value = 1.5;
+    notch3.gain.value = -16.0;
+
+    const notch4 = this.ctx.createBiquadFilter();
+    notch4.type = 'peaking';
+    notch4.frequency.value = 3400;
+    notch4.Q.value = 1.8;
+    notch4.gain.value = -12.0;
+
+    this.vocalSubtractor.connect(notch1);
+    notch1.connect(notch2);
+    notch2.connect(notch3);
+    notch3.connect(notch4);
+
+    // Stereo Channel Merger: maps vocal-suppressed signal into BOTH left & right stereo channels
+    this.vocalMerger = this.ctx.createChannelMerger(2);
+    notch4.connect(this.vocalMerger, 0, 0);
+    notch4.connect(this.vocalMerger, 0, 1);
+
+    // Bass Retention Filter (200 Hz Lowpass) to preserve beat, kick drums and bassline
     this.bassFilter = this.ctx.createBiquadFilter();
     this.bassFilter.type = 'lowpass';
-    this.bassFilter.frequency.value = 180;
+    this.bassFilter.frequency.value = 200;
     this.bassGain = this.ctx.createGain();
-    this.bassGain.gain.value = 0.9;
+    this.bassGain.gain.value = 1.25;
     this.bassFilter.connect(this.bassGain);
+    this.bassGain.connect(this.vocalMerger, 0, 0);
+    this.bassGain.connect(this.vocalMerger, 0, 1);
+
+    // High sparkle (Highpass 7500 Hz) to keep cymbals & acoustic room air
+    this.trebleFilter = this.ctx.createBiquadFilter();
+    this.trebleFilter.type = 'highpass';
+    this.trebleFilter.frequency.value = 7500;
+    this.trebleGain = this.ctx.createGain();
+    this.trebleGain.gain.value = 0.8;
+    this.trebleFilter.connect(this.trebleGain);
+    this.trebleGain.connect(this.vocalMerger, 0, 0);
+    this.trebleGain.connect(this.vocalMerger, 0, 1);
 
     this.karaokeDry = this.ctx.createGain();
     this.karaokeWet = this.ctx.createGain();
@@ -145,11 +190,11 @@ class AudioDSPEngine {
     // b) Karaoke Vocal Extractor Path
     lastNode.connect(this.karaokeSplitter);
     lastNode.connect(this.bassFilter);
+    lastNode.connect(this.trebleFilter);
 
     this.karaokeSplitter.connect(this.vocalL, 0);
     this.karaokeSplitter.connect(this.vocalR, 1);
-    this.vocalSubtractor.connect(this.karaokeWet);
-    this.bassGain.connect(this.karaokeWet);
+    this.vocalMerger.connect(this.karaokeWet);
 
     // Merge Karaoke outputs into Reverb & Master
     const dspOut = this.ctx.createGain();
@@ -230,7 +275,7 @@ class AudioDSPEngine {
     return impulse;
   }
 
-  // --- Karaoke Vocal Removal (True Center Channel Phase Cancellation) ---
+  // --- Karaoke Vocal Removal (True Center Phase Cancellation + Formant Notch) ---
   toggleKaraoke() {
     this.karaokeEnabled = !this.karaokeEnabled;
 
@@ -238,16 +283,21 @@ class AudioDSPEngine {
       this.attachAudioElement(window.AudioPlayer.audio);
     }
 
-    if (this.ctx && this.karaokeDry && this.karaokeWet) {
-      const now = this.ctx.currentTime;
-      if (this.karaokeEnabled) {
-        // Crossfade to Center Vocal Subtraction Matrix
-        this.karaokeDry.gain.setTargetAtTime(0.0, now, 0.05);
-        this.karaokeWet.gain.setTargetAtTime(1.15, now, 0.05);
-      } else {
-        // Restore pristine original audio
-        this.karaokeDry.gain.setTargetAtTime(1.0, now, 0.05);
-        this.karaokeWet.gain.setTargetAtTime(0.0, now, 0.05);
+    if (this.ctx) {
+      if (this.ctx.state === 'suspended') {
+        this.ctx.resume();
+      }
+      if (this.karaokeDry && this.karaokeWet) {
+        const now = this.ctx.currentTime;
+        if (this.karaokeEnabled) {
+          // Crossfade to Center Vocal Subtraction Matrix + Formant Notches
+          this.karaokeDry.gain.setTargetAtTime(0.0, now, 0.04);
+          this.karaokeWet.gain.setTargetAtTime(1.35, now, 0.04);
+        } else {
+          // Restore pristine original audio
+          this.karaokeDry.gain.setTargetAtTime(1.0, now, 0.04);
+          this.karaokeWet.gain.setTargetAtTime(0.0, now, 0.04);
+        }
       }
     }
 
