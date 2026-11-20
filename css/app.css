@@ -780,12 +780,19 @@ html, body {
   height: 100%;
   background-size: cover;
   background-position: center;
-  filter: none !important;
-  -webkit-filter: none !important;
-  opacity: 0.16;
-  transform: none;
+  opacity: 0.25;
   transition: background-image 0.8s ease;
   z-index: 1;
+}
+
+#fullscreen-player::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 18% 30%, rgba(140, 50, 220, 0.42) 0%, rgba(10, 10, 18, 0.94) 62%),
+              radial-gradient(circle at 82% 70%, rgba(255, 42, 109, 0.28) 0%, rgba(6, 6, 12, 0.98) 75%);
+  z-index: 2;
+  pointer-events: none;
 }
 
 .player-body {
@@ -1003,19 +1010,52 @@ html, body {
   fill: #ffffff;
 }
 
+/* Button Focus Preview Badge */
+.player-btn-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 38px;
+  margin-bottom: 16px;
+  padding: 6px 16px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 20px;
+  width: fit-content;
+  max-width: 100%;
+  opacity: 0.95;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.preview-badge-action {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--dynamic-accent, #ff2a6d);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.preview-badge-desc {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.88);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Right Lyrics Column (am-lyrics Apple Music style) */
 .player-side-column {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: rgba(18, 18, 26, 0.72);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  border-radius: 40px;
-  border: 1px solid var(--glass-border);
-  padding: 36px 48px;
+  background: transparent;
+  border: none;
+  padding: 0 16px 0 24px;
   overflow: hidden;
   position: relative;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 1) 12%, rgba(0, 0, 0, 1) 85%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 1) 12%, rgba(0, 0, 0, 1) 85%, transparent 100%);
 }
 
 .lyrics-stage {
@@ -1024,8 +1064,8 @@ html, body {
   scrollbar-width: none;
   display: flex;
   flex-direction: column;
-  gap: 32px;
-  padding: 80px 0 240px 0;
+  gap: 36px;
+  padding: 100px 0 260px 0;
 }
 
 .lyrics-stage::-webkit-scrollbar {
@@ -1034,23 +1074,50 @@ html, body {
 
 /* Inactive lyrics clean contrast */
 .lrc-line {
-  font-size: 32px;
+  font-size: 34px;
   font-weight: 600;
-  line-height: 1.45;
-  color: rgba(255, 255, 255, 0.35);
-  transform: scale(0.98);
+  line-height: 1.48;
+  color: rgba(255, 255, 255, 0.36);
+  transform: scale(0.96);
   transform-origin: left center;
-  transition: transform 0.25s ease, color 0.25s ease;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   cursor: pointer;
   outline: none;
+  padding: 8px 16px;
+  border-radius: 16px;
+  position: relative;
 }
 
-/* Active line focused */
+.lrc-line:focus {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+  transform: scale(1.0);
+}
+
+.lrc-line.nearby {
+  color: rgba(255, 255, 255, 0.62);
+  transform: scale(0.99);
+}
+
+/* Active line focused - Apple Music Grandeur */
 .lrc-line.active {
-  font-size: 40px;
+  font-size: 46px;
   font-weight: 800;
   color: #ffffff;
-  transform: scale(1.02) translateX(6px);
+  transform: scale(1.06) translateX(12px);
+  text-shadow: 0 0 24px rgba(255, 255, 255, 0.7), 0 0 50px var(--dynamic-glow);
+}
+
+.lrc-line.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 15%;
+  height: 70%;
+  width: 5px;
+  border-radius: 4px;
+  background: var(--dynamic-accent);
+  box-shadow: 0 0 16px var(--dynamic-glow);
 }
 
 /* Syllable word sweep */

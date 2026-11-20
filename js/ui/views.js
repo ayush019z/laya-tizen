@@ -229,15 +229,13 @@ class UIViewController {
       row.setAttribute('tabindex', '0');
       row.setAttribute('data-id', track.id);
 
-      const relTime = window.Library.getRelativeTime(track.playedAt);
-
       row.innerHTML = `
         <div class="recognized-artwork">
           <img src="${track.artwork}" alt="${track.title}" loading="lazy"/>
         </div>
         <div class="recognized-info">
           <div class="recognized-track-title">${track.title}</div>
-          <div class="recognized-track-sub">${track.artist} • ${relTime}</div>
+          <div class="recognized-track-sub">${track.artist}</div>
         </div>
         <div style="font-size: 14px; color: var(--text-dim); margin-right: 8px;">${track.durationFormatted || '3:00'}</div>
       `;
@@ -289,6 +287,15 @@ class UIViewController {
       kbContainer.appendChild(rowElem);
     });
 
+    const searchInput = document.getElementById('search-input-field');
+    if (searchInput && !searchInput._boundInput) {
+      searchInput._boundInput = true;
+      searchInput.addEventListener('input', (e) => {
+        this.searchQuery = e.target.value;
+        this.triggerLiveSearch();
+      });
+    }
+
     const clearQueryBtn = document.getElementById('btn-clear-query');
     if (clearQueryBtn) {
       clearQueryBtn.addEventListener('click', () => {
@@ -306,9 +313,26 @@ class UIViewController {
     }
   }
 
+  triggerLiveSearch() {
+    clearTimeout(this._searchDebounceTimer);
+    const query = (this.searchQuery || '').trim();
+    const resultsContainer = document.getElementById('search-results-container');
+    if (!query) {
+      if (resultsContainer) resultsContainer.innerHTML = '';
+      return;
+    }
+
+    // Trigger instant search as user types without requiring search button click
+    if (query.length >= 2) {
+      this._searchDebounceTimer = setTimeout(() => {
+        this.executeSearch(false); // false = keep focus on typing keyboard
+      }, 320);
+    }
+  }
+
   handleVirtualKey(key) {
     const now = Date.now();
-    if (this._lastKeyTime && now - this._lastKeyTime < 180) {
+    if (this._lastKeyTime && now - this._lastKeyTime < 160) {
       return;
     }
     this._lastKeyTime = now;
@@ -327,12 +351,13 @@ class UIViewController {
       if (resultsContainer) resultsContainer.innerHTML = '';
       return;
     } else if (key === 'SEARCH') {
-      this.executeSearch();
+      this.executeSearch(true); // true = focus first result
       return;
     } else {
       input.value += key;
     }
     this.searchQuery = input.value;
+    this.triggerLiveSearch();
   }
 
   startVoiceSearch() {
@@ -370,7 +395,7 @@ class UIViewController {
     if (input) input.focus();
   }
 
-  async executeSearch() {
+  async executeSearch(autoFocusFirst = true) {
     const query = this.searchQuery.trim();
     const resultsContainer = document.getElementById('search-results-container');
     if (!resultsContainer) return;
@@ -380,7 +405,9 @@ class UIViewController {
       return;
     }
 
-    resultsContainer.innerHTML = `<div style="color: var(--text-sub); font-size: 18px; padding: 24px; text-align: center;">Searching for "${query}"...</div>`;
+    if (autoFocusFirst) {
+      resultsContainer.innerHTML = `<div style="color: var(--text-sub); font-size: 18px; padding: 24px; text-align: center;">Searching for "${query}"...</div>`;
+    }
 
     const results = await window.MusicProvider.search(query);
     resultsContainer.innerHTML = '';
@@ -419,13 +446,16 @@ class UIViewController {
       resultsContainer.appendChild(row);
     });
 
-    // Auto-focus the first search result for immediate playback with OK button
-    setTimeout(() => {
-      const firstRow = resultsContainer.querySelector('.recognized-track-row');
-      if (firstRow && window.SpatialNav) {
-        window.SpatialNav.setFocus(firstRow);
-      }
-    }, 100);
+    // Auto-focus the first search result ONLY when explicitly requested (e.g. clicked SEARCH button)
+    // When live-typing, keep focus on the keyboard so typing is uninterrupted
+    if (autoFocusFirst) {
+      setTimeout(() => {
+        const firstRow = resultsContainer.querySelector('.recognized-track-row');
+        if (firstRow && window.SpatialNav) {
+          window.SpatialNav.setFocus(firstRow);
+        }
+      }, 100);
+    }
   }
 
   // --- 4. Library Screen (Liked Songs & Playlists) ---
@@ -631,6 +661,55 @@ class UIViewController {
         this.switchView('settings');
       });
     }
+
+    // Attach TV Button Preview HUD
+    this.setupButtonPreviews();
+  }
+
+  setupButtonPreviews() {
+    const previewMap = {
+      'fs-play-pause-btn': { action: 'Play / Pause', desc: 'Toggle music playback' },
+      'fs-prev-btn': { action: 'Previous Track', desc: 'Restart track or go to previous' },
+      'fs-next-btn': { action: 'Next Track', desc: 'Skip to next song in queue' },
+      'fs-shuffle-btn': { action: 'Shuffle Queue', desc: 'Randomize playback order' },
+      'fs-repeat-btn': { action: 'Repeat Mode', desc: 'Repeat current song or playlist' },
+      'btn-karaoke-stage': { action: 'Vocals Mode (Karaoke)', desc: 'Attenuate center vocals for singing' },
+      'btn-party-jukebox': { action: 'Party Jukebox', desc: 'Scan QR code to let guests queue songs' },
+      'btn-fav-track': { action: 'Liked Songs', desc: 'Save to or remove from your favorites' },
+      'btn-toggle-queue': { action: 'Upcoming Queue', desc: 'View and manage upcoming queue' },
+      'btn-player-settings': { action: 'Audio FX & Reverb', desc: '5-band EQ, studio reverb & sleep timer' },
+      'player-scrubber-track': { action: 'Scrubber / Seek', desc: 'Press OK to jump to position' },
+      'btn-exit-karaoke': { action: 'Exit Vocals Mode', desc: 'Return to normal audio' }
+    };
+
+    const previewBadge = document.getElementById('player-btn-preview');
+    if (!previewBadge) return;
+
+    const actionText = previewBadge.querySelector('.preview-badge-action');
+    const descText = previewBadge.querySelector('.preview-badge-desc');
+
+    const updateBadge = (info) => {
+      if (actionText) actionText.textContent = info.action;
+      if (descText) descText.textContent = info.desc;
+      previewBadge.style.opacity = '1';
+      previewBadge.style.transform = 'scale(1.02)';
+    };
+
+    const resetBadge = () => {
+      if (actionText) actionText.textContent = 'Laya Controls';
+      if (descText) descText.textContent = 'Select control with TV remote';
+      previewBadge.style.opacity = '0.7';
+      previewBadge.style.transform = 'scale(1)';
+    };
+
+    Object.keys(previewMap).forEach(btnId => {
+      const btn = document.getElementById(btnId);
+      if (btn) {
+        btn.addEventListener('focus', () => updateBadge(previewMap[btnId]));
+        btn.addEventListener('mouseenter', () => updateBadge(previewMap[btnId]));
+        btn.addEventListener('blur', resetBadge);
+      }
+    });
   }
 
   renderPlayerQueue() {
@@ -734,10 +813,17 @@ class UIViewController {
       if (currLine) {
         currLine.classList.add('active');
 
+        // Apple Music stepped visual depth
+        container.querySelectorAll('.lrc-line.nearby').forEach(el => el.classList.remove('nearby'));
+        const nextLine = container.querySelector(`.lrc-line[data-line="${activeLineIdx + 1}"]`);
+        const prevAdjacent = container.querySelector(`.lrc-line[data-line="${activeLineIdx - 1}"]`);
+        if (nextLine) nextLine.classList.add('nearby');
+        if (prevAdjacent) prevAdjacent.classList.add('nearby');
+
         // High-performance smooth scroll
         const containerH = container.clientHeight || 500;
         const lineTop = currLine.offsetTop;
-        const lineH = currLine.clientHeight || 50;
+        const lineH = currLine.clientHeight || 60;
         container.scrollTo({
           top: Math.max(0, lineTop - (containerH / 2) + (lineH / 2)),
           behavior: 'smooth'
@@ -1032,12 +1118,8 @@ class UIViewController {
     }
 
     if (window.AudioDSP) {
-      if (this.isKaraokeActive) {
-        window.AudioDSP.setEQBand(2, -10); // Cut center vocals
-        window.AudioDSP.setEQBand(3, -8);
-      } else {
-        window.AudioDSP.setEQBand(2, 0);
-        window.AudioDSP.setEQBand(3, 0);
+      if (window.AudioDSP.karaokeEnabled !== this.isKaraokeActive) {
+        window.AudioDSP.toggleKaraoke();
       }
     }
 

@@ -1,12 +1,13 @@
 {
-  "version": "1.2.1",
-  "build": 106,
+  "version": "1.3.0",
+  "build": 110,
   "releaseDate": "2026-11-21",
   "minTizenVersion": "3.0",
   "updateUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/version.json",
   "bundleBaseUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/",
-  "changelog": "Unified YouTube Music InnerTube and JioSaavn engine with 100% ad-free high-bitrate streaming, official brand icon, and instant full-length playback.",
+  "changelog": "Algorithmic taste-based homepage row, instant live search as you type, Apple Music glowing lyrics, TV remote button preview HUD, True Center-Channel Vocals Mode (Karaoke), clean history, and 512x512 squircle launcher icon.",
   "files": [
+    "index.html",
     "css/app.css",
     "js/lib/crypto-js.min.js",
     "js/navigation/remote-keys.js",
@@ -15,6 +16,7 @@
     "js/player/audio-controller.js",
     "js/providers/lyrics-service.js",
     "js/providers/innertube.js",
+    "js/ui/library.js",
     "js/ui/views.js",
     "version.json"
   ]

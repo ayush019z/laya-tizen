@@ -160,15 +160,63 @@ class MusicProvider {
   }
 
   /**
-   * Get Home Shelves / Recommendations (Immediate zero-delay delivery)
+   * Get Home Shelves / Recommendations (With Algorithmic Taste Matching from History)
    */
   async getHomeFeed() {
+    // 1. Dynamic Algorithmic Shelf based on Played Songs History
+    let algoShelf = null;
+    try {
+      const history = window.Library ? window.Library.getHistory() : [];
+      if (history && history.length > 0) {
+        const artistFreq = {};
+        const playedTitles = new Set();
+        history.forEach(t => {
+          if (t.title) playedTitles.add(t.title.toLowerCase());
+          const primaryArtist = (t.artist || '').split(/[,&•]/)[0].trim();
+          if (primaryArtist && primaryArtist !== 'Artist') {
+            artistFreq[primaryArtist] = (artistFreq[primaryArtist] || 0) + 1;
+          }
+        });
+
+        const sortedArtists = Object.keys(artistFreq).sort((a, b) => artistFreq[b] - artistFreq[a]);
+        const favoriteArtist = sortedArtists[0] || (history[0] ? history[0].artist : 'Arijit Singh');
+        const lastPlayedSong = history[0];
+
+        // Query recommendation engine for tracks related to user's favorite artist
+        const algoQuery = `${favoriteArtist} hits`;
+        const discovered = await this.search(algoQuery);
+        if (discovered && discovered.length > 0) {
+          const unplayed = discovered.filter(s => !playedTitles.has(s.title.toLowerCase()));
+          const recommendedItems = (unplayed.length >= 4 ? unplayed : discovered).slice(0, 10);
+          
+          algoShelf = {
+            title: 'Recommended For You',
+            subtitle: lastPlayedSong ? `Inspired by "${lastPlayedSong.title}" & ${favoriteArtist}` : `Based on your music taste`,
+            items: recommendedItems
+          };
+        }
+      }
+    } catch (e) {
+      console.warn('[MusicProvider] Algorithmic feed error:', e);
+    }
+
+    if (!algoShelf) {
+      algoShelf = {
+        title: 'Recommended For You',
+        subtitle: 'Hand-picked for your music taste',
+        items: [
+          this.curatedCatalogue[1], // Kesariya
+          this.curatedCatalogue[0], // Tum Hi Ho
+          this.curatedCatalogue[3], // Apna Bana Le
+          this.curatedCatalogue[6], // Satranga
+          this.curatedCatalogue[4], // Agar Tum Saath Ho
+          this.curatedCatalogue[5]  // O Maahi
+        ]
+      };
+    }
+
     return [
-      {
-        title: 'Best of Arijit Singh',
-        subtitle: 'Evergreen Bollywood romantic melodies',
-        items: this.curatedCatalogue
-      },
+      algoShelf,
       {
         title: 'Trending Bollywood Hits',
         subtitle: 'Most played Hindi songs on Laya',
@@ -182,6 +230,11 @@ class MusicProvider {
           this.curatedCatalogue[2], // Channa Mereya
           this.curatedCatalogue[7]  // Shayad
         ]
+      },
+      {
+        title: 'Best of Arijit Singh',
+        subtitle: 'Evergreen Bollywood romantic melodies',
+        items: this.curatedCatalogue
       },
       {
         title: 'Melodic & Soulful Romance',

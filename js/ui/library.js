@@ -77,11 +77,8 @@ class LibraryStore {
   addHistory(track) {
     if (!track) return;
     this.history = this.history.filter(t => t.id !== track.id);
-    this.history.unshift({
-      ...track,
-      playedAt: Date.now()
-    });
-    if (this.history.length > 80) {
+    this.history.unshift(track);
+    if (this.history.length > 50) {
       this.history.pop();
     }
     this.save(this.storageKeyHistory, this.history);

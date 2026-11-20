@@ -96,14 +96,39 @@ class AudioDSPEngine {
       return filter;
     });
 
-    // 2. Build Reverb Network
+    // 2. Build Karaoke Center-Channel Vocal Subtraction Network (L - R)
+    this.karaokeSplitter = this.ctx.createChannelSplitter(2);
+    this.vocalL = this.ctx.createGain();
+    this.vocalL.gain.value = 1.0;
+    this.vocalR = this.ctx.createGain();
+    this.vocalR.gain.value = -1.0; // Inverted phase to cancel center-panned vocals
+
+    this.vocalSubtractor = this.ctx.createGain();
+    this.vocalSubtractor.gain.value = 1.0;
+    this.vocalL.connect(this.vocalSubtractor);
+    this.vocalR.connect(this.vocalSubtractor);
+
+    // Bass Retention Filter (180 Hz Lowpass) to preserve beat, kick drums and bassline
+    this.bassFilter = this.ctx.createBiquadFilter();
+    this.bassFilter.type = 'lowpass';
+    this.bassFilter.frequency.value = 180;
+    this.bassGain = this.ctx.createGain();
+    this.bassGain.gain.value = 0.9;
+    this.bassFilter.connect(this.bassGain);
+
+    this.karaokeDry = this.ctx.createGain();
+    this.karaokeWet = this.ctx.createGain();
+    this.karaokeDry.gain.value = 1.0;
+    this.karaokeWet.gain.value = 0.0;
+
+    // 3. Build Reverb Network
     this.convolverNode = this.ctx.createConvolver();
     this.reverbDryGain = this.ctx.createGain();
     this.reverbWetGain = this.ctx.createGain();
     this.reverbDryGain.gain.value = 1.0;
     this.reverbWetGain.gain.value = 0.0;
 
-    // 3. Master Gain Node
+    // 4. Master Gain Node
     this.masterGain = this.ctx.createGain();
     this.masterGain.gain.value = 1.0;
 
@@ -114,9 +139,25 @@ class AudioDSPEngine {
       lastNode = filter;
     });
 
-    // Split after EQ into Dry and Reverb Wet
-    lastNode.connect(this.reverbDryGain);
-    lastNode.connect(this.convolverNode);
+    // Split after EQ into:
+    // a) Normal Dry Path
+    lastNode.connect(this.karaokeDry);
+    // b) Karaoke Vocal Extractor Path
+    lastNode.connect(this.karaokeSplitter);
+    lastNode.connect(this.bassFilter);
+
+    this.karaokeSplitter.connect(this.vocalL, 0);
+    this.karaokeSplitter.connect(this.vocalR, 1);
+    this.vocalSubtractor.connect(this.karaokeWet);
+    this.bassGain.connect(this.karaokeWet);
+
+    // Merge Karaoke outputs into Reverb & Master
+    const dspOut = this.ctx.createGain();
+    this.karaokeDry.connect(dspOut);
+    this.karaokeWet.connect(dspOut);
+
+    dspOut.connect(this.reverbDryGain);
+    dspOut.connect(this.convolverNode);
     this.convolverNode.connect(this.reverbWetGain);
 
     // Merge Dry + Wet into Master Gain -> Destination
@@ -189,22 +230,27 @@ class AudioDSPEngine {
     return impulse;
   }
 
-  // --- Karaoke Vocal Removal (Center Cancellation) ---
+  // --- Karaoke Vocal Removal (True Center Channel Phase Cancellation) ---
   toggleKaraoke() {
     this.karaokeEnabled = !this.karaokeEnabled;
 
-    if (this.karaokeEnabled && !this.isAttached && window.AudioPlayer?.audio) {
+    if (!this.isAttached && window.AudioPlayer?.audio) {
       this.attachAudioElement(window.AudioPlayer.audio);
     }
 
-    // Boost vocal-reduction mid attenuation or phase invert
-    if (this.karaokeEnabled) {
-      this.setEQBand(2, -10); // Cut 1kHz vocal frequency by 10dB
-      this.setEQBand(3, -8);  // Cut 4kHz harmonic frequency by 8dB
-    } else {
-      this.setEQBand(2, 0);
-      this.setEQBand(3, 0);
+    if (this.ctx && this.karaokeDry && this.karaokeWet) {
+      const now = this.ctx.currentTime;
+      if (this.karaokeEnabled) {
+        // Crossfade to Center Vocal Subtraction Matrix
+        this.karaokeDry.gain.setTargetAtTime(0.0, now, 0.05);
+        this.karaokeWet.gain.setTargetAtTime(1.15, now, 0.05);
+      } else {
+        // Restore pristine original audio
+        this.karaokeDry.gain.setTargetAtTime(1.0, now, 0.05);
+        this.karaokeWet.gain.setTargetAtTime(0.0, now, 0.05);
+      }
     }
+
     this.updateStats();
     return this.karaokeEnabled;
   }
