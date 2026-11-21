@@ -1561,6 +1561,7 @@ class UIViewController {
   }
 
   openFullscreenPlayer() {
+    this.ensureDynamicDOM();
     const fsPlayer = document.getElementById('fullscreen-player');
     if (fsPlayer) {
       fsPlayer.classList.add('active');
