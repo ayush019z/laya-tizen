@@ -123,6 +123,15 @@ html, body {
 }
 
 /* Global TV Remote High-Contrast Focus Ring */
+.focusable,
+button,
+.media-card,
+.nav-tab-pill,
+.dock-search-circle {
+  transition: transform 0.12s cubic-bezier(0.16, 1, 0.3, 1), outline 0.1s ease !important;
+  will-change: transform;
+}
+
 .focusable:focus,
 .focusable.focused,
 button:focus,
@@ -135,7 +144,7 @@ button.focused,
 .dock-search-circle.focused {
   outline: 3px solid #ffffff !important;
   box-shadow: 0 0 24px rgba(255, 255, 255, 0.7), 0 0 45px var(--dynamic-glow) !important;
-  transform: scale(1.06) !important;
+  transform: scale(1.06) translateZ(0) !important;
   z-index: 25 !important;
 }
 

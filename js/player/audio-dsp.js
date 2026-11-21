@@ -57,7 +57,11 @@ class AudioDSPEngine {
       if (!this.ctx) {
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         if (AudioContext) {
-          this.ctx = new AudioContext();
+          try {
+            this.ctx = new AudioContext({ latencyHint: 'interactive' });
+          } catch (err) {
+            this.ctx = new AudioContext();
+          }
           this.setupDSPChain();
         }
       }

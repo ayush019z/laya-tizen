@@ -1814,15 +1814,26 @@ class UIViewController {
         this.showToast('🎤 TV Hardware Mic LIVE through TV speakers!');
       };
 
+      const audioConstraints = {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+        latency: 0
+      };
+
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        navigator.mediaDevices.getUserMedia({ audio: true })
+        navigator.mediaDevices.getUserMedia({ audio: audioConstraints })
           .then(handleStream)
-          .catch(err => console.warn('[TVMic] getUserMedia error:', err));
+          .catch(err => {
+            console.warn('[TVMic] High-speed getUserMedia error, falling back:', err);
+            navigator.mediaDevices.getUserMedia({ audio: true }).then(handleStream).catch(e => console.warn(e));
+          });
       } else {
         const gum = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
         if (gum) {
-          gum.call(navigator, { audio: true }, handleStream, (err) => {
-            console.warn('[TVMic] legacy getUserMedia error:', err);
+          gum.call(navigator, { audio: audioConstraints }, handleStream, (err) => {
+            console.warn('[TVMic] legacy getUserMedia error, falling back:', err);
+            gum.call(navigator, { audio: true }, handleStream, (e) => console.warn(e));
           });
         } else {
           console.warn('[TVMic] getUserMedia not supported on this TV runtime');

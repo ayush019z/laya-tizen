@@ -1,11 +1,11 @@
 {
-  "version": "1.4.1",
-  "build": 190,
+  "version": "1.4.2",
+  "build": 191,
   "releaseDate": "2026-11-22",
   "minTizenVersion": "3.0",
   "updateUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/version.json",
   "bundleBaseUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/",
-  "changelog": "Syntax error fix, player controls cleanup, default romanised and dual-tone lyrics in Settings, Casio/Bluetooth/USB mic direct TV speaker passthrough, enhanced spatial navigation.",
+  "changelog": "Low-latency audio optimization (interactive latencyHint, zero-latency software mic buffers), spatial navigation reflow throttling, GPU hardware acceleration on D-pad navigation.",
   "files": [
     "index.html",
     "mic.html",

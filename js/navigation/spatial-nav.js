@@ -16,9 +16,16 @@ class SpatialNavigator {
       const el = e.target.closest(this.focusableSelector);
       if (el) this.setFocus(el);
     }, true);
-    // Re-verify focus periodically or on DOM mutations
-    const observer = new MutationObserver(() => this.validateFocus());
-    observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+    // Re-verify focus periodically or on DOM mutations (debounced to avoid layout thrashing during playback)
+    let focusDebounceTimer = null;
+    const observer = new MutationObserver(() => {
+      if (focusDebounceTimer) return;
+      focusDebounceTimer = setTimeout(() => {
+        focusDebounceTimer = null;
+        this.validateFocus();
+      }, 250);
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
   }
 
   getFocusableElements(container = document) {
