@@ -266,7 +266,7 @@
 
     if (window.RemoteBridge) {
       window.RemoteBridge.initMobile(roomParam, (data) => {
-        if (data.type === 'TV_ACK') {
+        if (data.type === 'TV_ACK' || data.type === 'QUEUE_ACK') {
           roomTag.classList.add('connected');
           roomTag.textContent = `🟢 LINKED (${roomParam})`;
         }
@@ -348,10 +348,21 @@
         }, 3000);
       }
 
-      // Send directly to TV via RemoteBridge
+      // 1. Send directly to TV via redundant RemoteBridge (ntfy.ca + ntfy.sh)
       if (window.RemoteBridge) {
         window.RemoteBridge.send({ type: 'ADD_GUEST_TRACK', track: track, room: roomParam });
       }
+
+      // 2. BroadcastChannel for instant local / cross-tab delivery
+      try {
+        const bc = new BroadcastChannel('laya_party_jukebox');
+        bc.postMessage({ type: 'ADD_GUEST_TRACK', track: track, room: roomParam });
+      } catch (e) {}
+
+      // 3. LocalStorage fallback
+      try {
+        localStorage.setItem('laya_guest_incoming_track', JSON.stringify({ track: track, room: roomParam, time: Date.now() }));
+      } catch (e) {}
 
       showToast(`Added "${track.title}" to TV queue! 🎉`);
     };

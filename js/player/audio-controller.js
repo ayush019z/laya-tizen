@@ -106,10 +106,13 @@ class AudioController {
 
   togglePlayPause() {
     if (!this.currentTrack) {
-      const first = window.Queue.getCurrentTrack() || window.MusicProvider.curatedCatalogue[0];
+      const first = window.Queue ? window.Queue.getCurrentTrack() : null;
       if (first) {
-        window.Queue.setQueue(window.MusicProvider.curatedCatalogue, 0);
         this.playTrack(first);
+      } else {
+        if (window.UIController) {
+          window.UIController.showToast('Queue is empty. Select a song to play.');
+        }
       }
       return;
     }

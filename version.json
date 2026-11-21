@@ -1,11 +1,11 @@
 {
-  "version": "1.3.9",
-  "build": 180,
+  "version": "1.4.0",
+  "build": 185,
   "releaseDate": "2026-11-22",
   "minTizenVersion": "3.0",
   "updateUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/version.json",
   "bundleBaseUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/",
-  "changelog": "Smart song matching for Apple Music imports, revamped neon audio spectrum visualizer, native WebRTC live wireless mic audio streaming to TV speakers.",
+  "changelog": "Empty queue on boot, dynamic DOM injection for playlist view (fixes blank screen), dual-host remote bridge for party jukebox queueing.",
   "files": [
     "index.html",
     "mic.html",

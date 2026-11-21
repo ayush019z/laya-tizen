@@ -18,12 +18,12 @@ class UIViewController {
 
   init() {
     this.ensureDynamicDOM();
-    if (window.Queue && window.MusicProvider && window.MusicProvider.curatedCatalogue) {
-      window.Queue.setQueue(window.MusicProvider.curatedCatalogue, 0);
-      const first = window.Queue.getCurrentTrack();
-      if (first && window.AudioPlayer) {
-        window.AudioPlayer.updateMetadataUI(first);
-      }
+    if (window.Queue) {
+      window.Queue.tracks = [];
+      window.Queue.currentIndex = -1;
+      window.Queue.onChange(() => {
+        this.renderPlayerQueue();
+      });
     }
     this.setupNavigation();
     this.setupTopBar();
@@ -606,6 +606,7 @@ class UIViewController {
 
   // --- 4b. Dedicated Playlist Details View (Full Music Player Screen) ---
   openPlaylistView(playlistId) {
+    this.ensureDynamicDOM();
     const pl = window.Library && window.Library.getPlaylist ? window.Library.getPlaylist(playlistId) : null;
     if (!pl) {
       this.showToast('Playlist not found');
@@ -617,8 +618,19 @@ class UIViewController {
   }
 
   renderPlaylistDetails(pl) {
-    const container = document.getElementById('playlist-view-content');
-    if (!container) return;
+    this.ensureDynamicDOM();
+    let container = document.getElementById('playlist-view-content');
+    if (!container) {
+      const view = document.getElementById('view-playlist');
+      if (view) {
+        container = document.createElement('div');
+        container.id = 'playlist-view-content';
+        container.className = 'playlist-view-container';
+        view.appendChild(container);
+      } else {
+        return;
+      }
+    }
 
     const tracks = pl.tracks || [];
     const title = pl.title || pl.name || 'Untitled Playlist';
@@ -1742,7 +1754,13 @@ class UIViewController {
     if (!track) return;
     this.showToast(`🎉 Guest queued "${track.title}"!`);
 
-    // If streamUrl is missing (e.g. from iTunes mobile web search), resolve it via JioSaavn
+    // 1. Immediately push track to PlaybackQueue so Up Next queue displays it instantly
+    if (window.Queue) {
+      window.Queue.addTrack(track);
+    }
+    this.renderPlayerQueue();
+
+    // 2. Asynchronously resolve streamUrl if missing (e.g. from iTunes mobile web search)
     if (!track.streamUrl && window.MusicProvider) {
       try {
         const query = `${track.title} ${track.artist || ''}`.trim();
@@ -1761,14 +1779,12 @@ class UIViewController {
       }
     }
 
-    if (window.Queue) {
-      window.Queue.addTrack(track);
-    }
-    
-    // If nothing currently playing, start playing guest's song
+    // 3. If nothing currently playing, start playing guest's song
     if (window.AudioPlayer && (!window.AudioPlayer.currentTrack || window.AudioPlayer.audio.paused)) {
       window.AudioPlayer.playTrack(track);
       this.openFullscreenPlayer();
+    } else {
+      this.renderPlayerQueue();
     }
   }
 
@@ -2571,6 +2587,21 @@ class UIViewController {
         }
         document.body.appendChild(s);
       } catch(e) {}
+    }
+
+    // 7. Ensure Dedicated Playlist View Screen exists in DOM (required for OTA updates from earlier WGT builds)
+    if (!document.getElementById('view-playlist')) {
+      const section = document.createElement('section');
+      section.id = 'view-playlist';
+      section.className = 'view-screen';
+      section.innerHTML = `<div id="playlist-view-content" class="playlist-view-container"></div>`;
+      const settingsView = document.getElementById('view-settings');
+      if (settingsView && settingsView.parentNode) {
+        settingsView.parentNode.insertBefore(section, settingsView);
+      } else {
+        const container = document.querySelector('.app-container') || document.querySelector('main') || document.body;
+        container.appendChild(section);
+      }
     }
   }
 
