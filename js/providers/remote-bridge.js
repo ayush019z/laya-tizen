@@ -1,166 +1,153 @@
 /**
- * Laya TV - Real-Time Remote Bridge
- * Uses Secure WebSockets (HiveMQ / EMQX MQTT Broker) + WebRTC PeerJS
- * Provides instant (<50ms) bidirectional messaging between TV and mobile companion pages (Import, Mic, Party Jukebox).
+ * Laya TV - Real-Time Remote Bridge (HTTP SSE + WebSockets)
+ * Provides instant, zero-setup, cross-network communication between Samsung Smart TV
+ * and mobile companion pages (Import, Mic, Party Jukebox) on standard HTTPS port 443.
  */
 class RemoteBridgeService {
   constructor() {
-    this.client = null;
     this.roomCode = null;
     this.isTV = false;
     this.connected = false;
     this.callbacks = [];
-    this.peer = null;
-    this.peerCall = null;
+    this.eventSource = null;
+    this.ws = null;
+    this.beaconTimer = null;
+    this.fallbackPollTimer = null;
   }
 
   initTV(roomCode, onMessage) {
     this.isTV = true;
     this.roomCode = (roomCode || '').replace(/^LAYA-/i, '').trim();
     if (onMessage) this.callbacks.push(onMessage);
-    this.connectMQTT();
-    this.initPeerJS();
+    this.connectStream();
+
+    // TV broadcasts beacon every 3.5s so mobile companion connects instantly
+    if (this.beaconTimer) clearInterval(this.beaconTimer);
+    this.beaconTimer = setInterval(() => {
+      this.send({ type: 'TV_ACK', room: this.roomCode, status: 'BEACON', time: Date.now() });
+    }, 3500);
   }
 
   initMobile(roomCode, onMessage) {
     this.isTV = false;
     this.roomCode = (roomCode || '').replace(/^LAYA-/i, '').trim();
     if (onMessage) this.callbacks.push(onMessage);
-    this.connectMQTT();
+    this.connectStream();
+
+    // Announce mobile presence immediately
+    this.send({ type: 'PHONE_HELLO', room: this.roomCode, time: Date.now() });
   }
 
-  connectMQTT() {
-    if (!window.Paho || !window.Paho.MQTT) {
-      console.warn('[RemoteBridge] Paho MQTT not available in window');
-      return;
-    }
+  connectStream() {
+    const subTopic = this.isTV
+      ? `layatv_room_${this.roomCode}_tv`
+      : `layatv_room_${this.roomCode}_phone`;
 
-    const clientId = (this.isTV ? 'layatv_' : 'layamob_') + Math.random().toString(16).substr(2, 8);
-    const host = 'broker.hivemq.com';
-    const port = 8884;
-
-    try {
-      this.client = new Paho.MQTT.Client(host, port, '/mqtt', clientId);
-
-      this.client.onConnectionLost = (responseObject) => {
-        console.warn('[RemoteBridge] MQTT Connection Lost:', responseObject ? responseObject.errorMessage : 'Unknown');
-        this.connected = false;
-        setTimeout(() => this.connectMQTT(), 3500);
-      };
-
-      this.client.onMessageArrived = (message) => {
-        try {
-          const payload = JSON.parse(message.payloadString);
-          this.callbacks.forEach(cb => {
-            try { cb(payload, message.destinationName); } catch (e) { console.warn(e); }
-          });
-        } catch (e) {
-          console.warn('[RemoteBridge] Error parsing incoming MQTT message:', e);
+    // 1. Primary Transport: HTML5 EventSource (Standard HTTPS 443, zero polling)
+    if (typeof EventSource !== 'undefined') {
+      try {
+        if (this.eventSource) {
+          try { this.eventSource.close(); } catch(e){}
         }
-      };
+        const sseUrl = `https://ntfy.sh/${subTopic}/sse`;
+        this.eventSource = new EventSource(sseUrl);
 
-      const options = {
-        useSSL: true,
-        timeout: 6,
-        keepAliveInterval: 30,
-        cleanSession: true,
-        onSuccess: () => {
+        this.eventSource.onopen = () => {
           this.connected = true;
-          console.log('[RemoteBridge] Connected to MQTT broker:', host);
-          const subTopic = this.isTV
-            ? `layatv/room/${this.roomCode}/from_phone`
-            : `layatv/room/${this.roomCode}/from_tv`;
-          this.client.subscribe(subTopic);
-          console.log('[RemoteBridge] Subscribed to:', subTopic);
-
+          console.log('[RemoteBridge] SSE connected:', subTopic);
           if (!this.isTV) {
-            // Mobile pings TV immediately on connect
             this.send({ type: 'PHONE_HELLO', room: this.roomCode, time: Date.now() });
           }
-        },
-        onFailure: (err) => {
-          console.warn('[RemoteBridge] HiveMQ connect failed, retrying on EMQX...', err);
-          setTimeout(() => this.connectFallbackMQTT(), 2500);
+        };
+
+        this.eventSource.onmessage = (event) => {
+          this.handleRawIncoming(event.data, subTopic);
+        };
+
+        this.eventSource.onerror = (err) => {
+          console.warn('[RemoteBridge] SSE reconnecting...');
+          this.connected = false;
+        };
+        return;
+      } catch (err) {
+        console.warn('[RemoteBridge] EventSource failed, attempting WebSocket...', err);
+      }
+    }
+
+    // 2. Fallback Transport: WebSocket (Port 443)
+    this.connectWebSocket(subTopic);
+  }
+
+  connectWebSocket(subTopic) {
+    if (typeof WebSocket === 'undefined') return;
+    try {
+      if (this.ws) {
+        try { this.ws.close(); } catch(e){}
+      }
+      this.ws = new WebSocket(`wss://ntfy.sh/${subTopic}/ws`);
+      this.ws.onopen = () => {
+        this.connected = true;
+        console.log('[RemoteBridge] WebSocket connected:', subTopic);
+        if (!this.isTV) {
+          this.send({ type: 'PHONE_HELLO', room: this.roomCode, time: Date.now() });
         }
       };
-
-      this.client.connect(options);
-    } catch (err) {
-      console.warn('[RemoteBridge] MQTT init error:', err);
+      this.ws.onmessage = (event) => {
+        this.handleRawIncoming(event.data, subTopic);
+      };
+      this.ws.onclose = () => {
+        this.connected = false;
+        setTimeout(() => this.connectStream(), 4000);
+      };
+    } catch (e) {
+      console.warn('[RemoteBridge] WebSocket fallback error:', e);
     }
   }
 
-  connectFallbackMQTT() {
-    if (!window.Paho || !window.Paho.MQTT) return;
+  handleRawIncoming(rawStr, subTopic) {
     try {
-      const clientId = (this.isTV ? 'layatv_' : 'layamob_') + Math.random().toString(16).substr(2, 8);
-      this.client = new Paho.MQTT.Client('broker.emqx.io', 8084, '/mqtt', clientId);
-      this.client.onConnectionLost = () => setTimeout(() => this.connectMQTT(), 5000);
-      this.client.onMessageArrived = (message) => {
+      const entry = JSON.parse(rawStr);
+      if (entry.event === 'message' && entry.message) {
+        let payload = null;
         try {
-          const payload = JSON.parse(message.payloadString);
-          this.callbacks.forEach(cb => cb(payload, message.destinationName));
-        } catch (e) {}
-      };
-      this.client.connect({
-        useSSL: true,
-        timeout: 6,
-        cleanSession: true,
-        onSuccess: () => {
-          this.connected = true;
-          const subTopic = this.isTV
-            ? `layatv/room/${this.roomCode}/from_phone`
-            : `layatv/room/${this.roomCode}/from_tv`;
-          this.client.subscribe(subTopic);
-        },
-        onFailure: () => setTimeout(() => this.connectMQTT(), 5000)
-      });
-    } catch (e) {}
+          payload = JSON.parse(entry.message);
+        } catch (e) {
+          payload = entry.message;
+        }
+        if (payload) {
+          this.callbacks.forEach(cb => {
+            try { cb(payload, subTopic); } catch (err) { console.warn(err); }
+          });
+        }
+      }
+    } catch (err) {
+      // Direct raw message without ntfy wrapper
+      try {
+        const payload = JSON.parse(rawStr);
+        this.callbacks.forEach(cb => {
+          try { cb(payload, subTopic); } catch (err) { console.warn(err); }
+        });
+      } catch (e) {}
+    }
   }
 
   send(payload) {
-    if (!this.client || !this.connected) {
-      console.warn('[RemoteBridge] Cannot send, MQTT not connected');
-      return false;
-    }
-    try {
-      const pubTopic = this.isTV
-        ? `layatv/room/${this.roomCode}/from_tv`
-        : `layatv/room/${this.roomCode}/from_phone`;
-      const msg = new Paho.MQTT.Message(JSON.stringify(payload));
-      msg.destinationName = pubTopic;
-      msg.qos = 0;
-      this.client.send(msg);
-      return true;
-    } catch (err) {
-      console.warn('[RemoteBridge] send error:', err);
-      return false;
-    }
-  }
+    if (!this.roomCode) return false;
+    const pubTopic = this.isTV
+      ? `layatv_room_${this.roomCode}_phone`
+      : `layatv_room_${this.roomCode}_tv`;
 
-  initPeerJS() {
-    if (!window.Peer) return;
-    try {
-      this.peer = new Peer('layatv-' + this.roomCode, { debug: 1 });
-      this.peer.on('call', (call) => {
-        this.peerCall = call;
-        call.answer(); // Answer with no audio returned
-        call.on('stream', (remoteAudioStream) => {
-          if (window.AudioDSP) {
-            window.AudioDSP.attachMicrophoneStream(remoteAudioStream);
-          } else {
-            const a = new Audio();
-            a.srcObject = remoteAudioStream;
-            a.play().catch(() => {});
-          }
-        });
-      });
-      this.peer.on('error', (err) => {
-        console.warn('[RemoteBridge] PeerJS error:', err);
-      });
-    } catch (e) {
-      console.warn('[RemoteBridge] PeerJS init failed:', e);
-    }
+    const bodyStr = typeof payload === 'string' ? payload : JSON.stringify(payload);
+
+    fetch(`https://ntfy.sh/${pubTopic}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: bodyStr
+    }).catch(err => {
+      console.warn('[RemoteBridge] send error:', err);
+    });
+
+    return true;
   }
 }
 

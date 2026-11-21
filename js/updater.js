@@ -7,13 +7,19 @@
 class AppUpdater {
   constructor() {
     this.currentVersion = '1.3.9';
-    this.currentBuild = 165;
+    this.currentBuild = 170;
     this.defaultUpdateUrl = 'https://raw.githubusercontent.com/ayush019z/laya-tizen/main/version.json';
     this.updateUrl = localStorage.getItem('layatv_ota_url') || this.defaultUpdateUrl;
     this.isAutoUpdateEnabled = localStorage.getItem('layatv_ota_autocheck') !== 'false';
     this.activeVersion = localStorage.getItem('layatv_active_version') || this.currentVersion;
     this.status = 'idle'; // 'idle', 'checking', 'available', 'downloading', 'ready', 'up-to-date', 'error'
     this.remoteData = null;
+
+    // Purge outdated heavy libraries from cache
+    try {
+      localStorage.removeItem('layatv_ota_file_js/lib/peerjs.min.js');
+      localStorage.removeItem('layatv_ota_file_js/lib/paho-mqtt.min.js');
+    } catch(e) {}
 
     // Check updates after startup
     if (this.isAutoUpdateEnabled) {

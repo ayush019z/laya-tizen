@@ -571,10 +571,14 @@
   <!-- Dynamic OTA Hot-Reload Script Bootloader (Preserves Sequential Dependency Loading) -->
   <script>
     (function() {
+      // Clean up deprecated heavy libraries from previous builds
+      try {
+        localStorage.removeItem('layatv_ota_file_js/lib/peerjs.min.js');
+        localStorage.removeItem('layatv_ota_file_js/lib/paho-mqtt.min.js');
+      } catch(e) {}
+
       var scripts = [
         "js/lib/crypto-js.min.js",
-        "js/lib/paho-mqtt.min.js",
-        "js/lib/peerjs.min.js",
         "js/providers/remote-bridge.js",
         "js/navigation/spatial-nav.js",
         "js/navigation/remote-keys.js",
@@ -601,9 +605,19 @@
 
         var s = document.createElement('script');
         if (cached && cached.trim().length > 0) {
-          s.textContent = cached;
-          document.body.appendChild(s);
-          loadNext(index + 1);
+          try {
+            s.textContent = cached;
+            document.body.appendChild(s);
+            loadNext(index + 1);
+          } catch (evalErr) {
+            console.warn('[Bootloader] Eval error for cached', src, evalErr);
+            // Fallback to loading original file
+            var fallback = document.createElement('script');
+            fallback.src = src;
+            fallback.onload = function() { loadNext(index + 1); };
+            fallback.onerror = function() { loadNext(index + 1); };
+            document.body.appendChild(fallback);
+          }
         } else {
           s.src = src;
           s.onload = function() { loadNext(index + 1); };

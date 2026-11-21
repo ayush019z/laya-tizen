@@ -248,18 +248,6 @@
       line-height: 1.4;
     }
   </style>
-  <script src="js/lib/paho-mqtt.min.js"></script>
-  <script>
-    if (!window.Paho) {
-      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"><\/script>');
-    }
-  </script>
-  <script src="js/lib/peerjs.min.js"></script>
-  <script>
-    if (!window.Peer) {
-      document.write('<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"><\/script>');
-    }
-  </script>
   <script src="js/providers/remote-bridge.js"></script>
 </head>
 <body>
@@ -355,7 +343,7 @@
     const echoNum = document.getElementById('mic-echo-num');
     const footerHint = document.getElementById('footer-hint');
 
-    // 1. Initialize Real-Time WebSocket Remote Bridge
+    // 1. Initialize Real-Time Remote Bridge (SSE & WebSockets)
     if (window.RemoteBridge) {
       window.RemoteBridge.initMobile(roomCode, (data) => {
         if (data.type === 'TV_ACK') {
@@ -364,7 +352,7 @@
       });
     }
 
-    // Ping TV every 2.5 seconds until connected
+    // Ping TV periodically until connected
     let pingAttempts = 0;
     const pingTimer = setInterval(() => {
       if (!isConnectedToTV) {
@@ -372,16 +360,16 @@
           window.RemoteBridge.send({ type: 'PHONE_HELLO', room: roomCode, time: Date.now() });
         }
         pingAttempts++;
-        if (pingAttempts >= 4) {
+        if (pingAttempts >= 6) {
           statusPill.className = 'status-pill error';
           statusText.textContent = 'TV Offline';
-          micLabel.textContent = 'Code Not Found';
-          footerHint.textContent = `⚠️ Cannot find TV with code "${roomCode}". Make sure Laya TV is open on TV and code matches!`;
+          micLabel.textContent = 'Searching...';
+          footerHint.textContent = `⚠️ Waiting for TV with code "${roomCode}". Make sure Laya TV is open on your screen!`;
         }
       } else {
         clearInterval(pingTimer);
       }
-    }, 2500);
+    }, 2000);
 
     function onTVConnected() {
       if (!isConnectedToTV) {
