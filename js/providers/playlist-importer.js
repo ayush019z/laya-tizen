@@ -11,7 +11,11 @@ class PlaylistImporter {
   /**
    * Main import dispatcher based on link format or text
    */
-  async importFromUrl(urlOrText) {
+  async importPlaylist(urlOrText, onProgress) {
+    return await this.importFromUrl(urlOrText, onProgress);
+  }
+
+  async importFromUrl(urlOrText, onProgress) {
     if (!urlOrText || typeof urlOrText !== 'string') {
       throw new Error('Please provide a valid playlist link or song list');
     }
@@ -21,16 +25,16 @@ class PlaylistImporter {
 
     try {
       if (input.includes('spotify.com')) {
-        return await this.importSpotify(input);
+        return await this.importSpotify(input, onProgress);
       } else if (input.includes('jiosaavn.com') || input.includes('saavn.com')) {
-        return await this.importJioSaavn(input);
-      } else if (input.includes('music.apple.com')) {
-        return await this.importAppleMusic(input);
+        return await this.importJioSaavn(input, onProgress);
+      } else if (input.includes('music.apple.com') || input.includes('itunes.apple.com')) {
+        return await this.importAppleMusic(input, onProgress);
       } else if (input.includes('youtube.com') || input.includes('youtu.be')) {
-        return await this.importYouTube(input);
+        return await this.importYouTube(input, onProgress);
       } else {
         // Assume text list of tracks (e.g. "Tum Hi Ho\nKesariya")
-        return await this.importFromRawText(input);
+        return await this.importFromRawText(input, onProgress);
       }
     } finally {
       this.isImporting = false;
@@ -153,34 +157,139 @@ class PlaylistImporter {
   }
 
   /**
-   * 3. Apple Music Playlist Importer
+   * 3. Apple Music Playlist & Album Importer
    */
-  async importAppleMusic(url) {
+  async importAppleMusic(url, onProgress) {
     let name = 'Apple Music Playlist';
     const rawTrackList = [];
 
-    // Apple Music embed page has clean structured data
-    const embedUrl = url.replace('music.apple.com', 'embed.music.apple.com');
-    const res = await fetch(embedUrl);
-    if (!res.ok) {
-      throw new Error('Could not access Apple Music playlist embed.');
+    if (typeof onProgress === 'function') onProgress(15, 'Fetching Apple Music tracklist...');
+
+    // 1. If URL has an iTunes/Apple Music numeric ID (e.g. album or song: /album/name/123456789 or id=123456789)
+    const idMatch = url.match(/\/album\/[^/]+\/([0-9]+)/i) || url.match(/[\?&]id=([0-9]+)/i) || url.match(/\/id([0-9]+)/i);
+    if (idMatch && idMatch[1]) {
+      try {
+        const itunesUrl = `https://itunes.apple.com/lookup?id=${idMatch[1]}&entity=song`;
+        const res = await fetch(itunesUrl);
+        if (res.ok) {
+          const json = await res.json();
+          if (json && json.results && json.results.length > 0) {
+            const first = json.results[0];
+            name = first.collectionName || first.trackName || name;
+            json.results.forEach(item => {
+              if (item.wrapperType === 'track' || item.trackName) {
+                rawTrackList.push({
+                  title: item.trackName,
+                  artist: item.artistName || '',
+                  artwork: item.artworkUrl100 || item.artworkUrl60 || ''
+                });
+              }
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('iTunes API lookup fallback:', e);
+      }
     }
 
-    const html = await res.text();
-    const titleMatch = html.match(/<title>(.*?)<\/title>/i);
-    if (titleMatch) name = titleMatch[1].replace(/on Apple Music/gi, '').trim();
+    // 2. Fetch HTML directly or via proxy to parse LD+JSON & serialized data
+    if (rawTrackList.length === 0) {
+      let html = '';
+      const fetchTargets = [
+        url,
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+        `https://corsproxy.io/?url=${encodeURIComponent(url)}`
+      ];
 
-    const regex = /class="track-title"[^>]*>([^<]+)<\/div>[\s\S]*?class="track-artist"[^>]*>([^<]+)<\/div>/g;
-    let m;
-    while ((m = regex.exec(html)) !== null) {
-      rawTrackList.push({ title: m[1].trim(), artist: m[2].trim() });
+      for (const target of fetchTargets) {
+        try {
+          const res = await fetch(target, { cache: 'no-cache' });
+          if (res.ok) {
+            const text = await res.text();
+            if (text && (text.includes('application/ld+json') || text.includes('music:song') || text.includes('serialized-server-data'))) {
+              html = text;
+              break;
+            }
+          }
+        } catch (err) {
+          // continue to next proxy
+        }
+      }
+
+      if (html) {
+        // Extract title
+        const ogTitleMatch = html.match(/<meta property=["']og:title["'] content=["']([^"']+)["']/i) || html.match(/<title>([^<]+)<\/title>/i);
+        if (ogTitleMatch) {
+          name = ogTitleMatch[1].replace(/on Apple Music/gi, '').replace(/- Playlist - Apple Music/gi, '').trim();
+        }
+
+        // Strategy A: LD+JSON
+        const ldMatches = html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+        for (const m of ldMatches) {
+          try {
+            const ld = JSON.parse(m[1]);
+            const tracks = Array.isArray(ld.track) ? ld.track : (Array.isArray(ld) ? ld : []);
+            if (tracks.length > 0) {
+              if (ld.name) name = ld.name;
+              tracks.forEach(t => {
+                const title = t.name || t.title;
+                const artist = t.byArtist?.name || t.author?.name || '';
+                if (title) {
+                  rawTrackList.push({
+                    title,
+                    artist,
+                    artwork: t.audio?.thumbnailUrl || t.thumbnailUrl || ''
+                  });
+                }
+              });
+              if (rawTrackList.length > 0) break;
+            }
+          } catch (e) {}
+        }
+
+        // Strategy B: serialized-server-data JSON
+        if (rawTrackList.length === 0) {
+          const sMatch = html.match(/<script[^>]*id=["']serialized-server-data["'][^>]*>([\s\S]*?)<\/script>/i) ||
+                         html.match(/<script[^>]*type=["']application\/json["'][^>]*id=["']serialized-server-data["'][^>]*>([\s\S]*?)<\/script>/i);
+          if (sMatch) {
+            try {
+              const sJson = JSON.parse(sMatch[1]);
+              const sections = sJson.data?.[0]?.data?.sections || [];
+              sections.forEach(sec => {
+                if (Array.isArray(sec.items)) {
+                  sec.items.forEach(it => {
+                    const title = it.title;
+                    const artist = it.artistName || it.subtitle || '';
+                    if (title) {
+                      rawTrackList.push({ title, artist });
+                    }
+                  });
+                }
+              });
+            } catch (e) {}
+          }
+        }
+
+        // Strategy C: Meta tags music:song URL slugs
+        if (rawTrackList.length === 0) {
+          const songMeta = html.matchAll(/<meta property=["']music:song["'] content=["'][^"']*\/song\/([^/]+)\/[0-9]+["']/gi);
+          for (const sm of songMeta) {
+            const songName = decodeURIComponent(sm[1]).replace(/-/g, ' ');
+            if (songName) {
+              rawTrackList.push({ title: songName, artist: '' });
+            }
+          }
+        }
+      }
     }
 
     if (rawTrackList.length === 0) {
-      throw new Error('Could not parse Apple Music tracks. Ensure link is public.');
+      throw new Error('Could not parse song names from Apple Music link. Please ensure the link is public.');
     }
 
-    return await this.resolveAndSaveTracks(name, rawTrackList, url);
+    if (typeof onProgress === 'function') onProgress(30, `Found ${rawTrackList.length} songs. Matching audio streams...`);
+
+    return await this.resolveAndSaveTracks(name, rawTrackList, url, onProgress);
   }
 
   /**
@@ -230,12 +339,17 @@ class PlaylistImporter {
   /**
    * Helper: Resolves title+artist search queries to real YouTube Music tracks with audio streams
    */
-  async resolveAndSaveTracks(playlistName, rawTrackList, sourceUrl = '') {
+  async resolveAndSaveTracks(playlistName, rawTrackList, sourceUrl = '', onProgress = null) {
     const resolvedTracks = [];
     const limit = Math.min(rawTrackList.length, 50); // safety cap per import
 
     for (let i = 0; i < limit; i++) {
       const item = rawTrackList[i];
+      if (typeof onProgress === 'function') {
+        const pct = 30 + Math.round(((i + 1) / limit) * 65);
+        onProgress(pct, `Searching track ${i + 1}/${limit}: "${item.title}"`);
+      }
+
       const query = item.artist ? `${item.title} ${item.artist}` : item.title;
 
       try {
@@ -265,7 +379,20 @@ class PlaylistImporter {
       }
     }
 
-    return window.Library.savePlaylist(playlistName, resolvedTracks, sourceUrl);
+    if (window.Library && window.Library.savePlaylist) {
+      return window.Library.savePlaylist(playlistName, resolvedTracks, sourceUrl);
+    }
+
+    return {
+      id: 'pl_' + Date.now(),
+      name: playlistName,
+      title: playlistName,
+      tracks: resolvedTracks,
+      trackCount: resolvedTracks.length,
+      artwork: resolvedTracks[0]?.artwork || 'assets/icon.png',
+      sourceUrl,
+      createdAt: Date.now()
+    };
   }
 }
 

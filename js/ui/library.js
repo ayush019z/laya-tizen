@@ -106,11 +106,38 @@ class LibraryStore {
     return this.playlists || [];
   }
 
-  savePlaylist(name, tracks, sourceUrl = '') {
+  savePlaylist(nameOrPlaylist, tracks, sourceUrl = '') {
+    // If called with an existing playlist object
+    if (nameOrPlaylist && typeof nameOrPlaylist === 'object') {
+      const p = nameOrPlaylist;
+      const existing = this.playlists.find(item => item.id === p.id);
+      if (existing) {
+        return existing;
+      }
+      const playlist = {
+        id: p.id || ('pl_' + Date.now()),
+        name: p.name || p.title || 'Imported Playlist',
+        title: p.title || p.name || 'Imported Playlist',
+        tracks: p.tracks || [],
+        trackCount: (p.tracks || []).length,
+        artwork: p.artwork || p.tracks?.[0]?.artwork || 'assets/icon.png',
+        sourceUrl: p.sourceUrl || p.source || '',
+        createdAt: p.createdAt || Date.now()
+      };
+      if (playlist.tracks.length === 0) return null;
+      this.playlists.unshift(playlist);
+      this.save(this.storageKeyPlaylists, this.playlists);
+      if (window.UIController) {
+        window.UIController.showToast(`🎉 Imported "${playlist.name}" (${playlist.trackCount} tracks)!`);
+      }
+      return playlist;
+    }
+
     if (!tracks || tracks.length === 0) return null;
     const playlist = {
       id: 'pl_' + Date.now(),
-      name: name || 'Imported Playlist',
+      name: nameOrPlaylist || 'Imported Playlist',
+      title: nameOrPlaylist || 'Imported Playlist',
       tracks: tracks,
       trackCount: tracks.length,
       artwork: tracks[0]?.artwork || 'assets/icon.png',

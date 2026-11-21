@@ -547,8 +547,8 @@ class UIViewController {
         html += `
           <div class="media-card focusable" tabindex="0" data-imported-id="${pl.id}">
             <div class="media-card-artwork"><img src="${pl.artwork || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80'}"/></div>
-            <div class="media-card-title">${pl.title}</div>
-            <div class="media-card-author">${pl.tracks ? pl.tracks.length : 0} Tracks • ${pl.source || 'Imported'}</div>
+            <div class="media-card-title">${pl.title || pl.name || 'Playlist'}</div>
+            <div class="media-card-author">${pl.tracks ? pl.tracks.length : 0} Tracks • ${pl.source || pl.sourceUrl ? 'Imported' : 'Saved'}</div>
           </div>
         `;
       });
@@ -591,7 +591,7 @@ class UIViewController {
           window.Queue.setQueue(pl.tracks, 0);
           window.AudioPlayer.playTrack(pl.tracks[0]);
           this.openFullscreenPlayer();
-          this.showToast(`▶️ Playing "${pl.title}" (${pl.tracks.length} songs)`);
+          this.showToast(`▶️ Playing "${pl.title || pl.name}" (${pl.tracks.length} songs)`);
         }
       });
     });
@@ -1796,10 +1796,10 @@ class UIViewController {
       }
     } else if (data.type === 'PLAYLIST_IMPORT') {
       if (data.content) {
-        this.showToast('📲 Received playlist link from phone! Importing...');
+        this.showToast('📲 Received playlist from phone! Importing...');
         const input = document.getElementById('import-url-input');
         if (input) input.value = data.content;
-        this.executePlaylistImport();
+        this.executePlaylistImport(data.content);
 
         if (window.RemoteBridge) {
           window.RemoteBridge.send({
@@ -1938,9 +1938,9 @@ class UIViewController {
     }
   }
 
-  async executePlaylistImport() {
+  async executePlaylistImport(urlOverride) {
     const input = document.getElementById('import-url-input');
-    const val = input ? input.value.trim() : '';
+    const val = (urlOverride || (input ? input.value : '')).trim();
     if (!val) {
       this.showToast('⚠️ Please enter a playlist URL or song titles first');
       return;
@@ -1968,12 +1968,19 @@ class UIViewController {
       const playlist = await window.PlaylistImporter.importPlaylist(val, onProgress);
 
       if (playlist && playlist.tracks && playlist.tracks.length > 0) {
-        if (window.Library && window.Library.savePlaylist) {
-          window.Library.savePlaylist(playlist);
-        }
-
+        const playlistTitle = playlist.title || playlist.name || 'Imported Playlist';
         onProgress(100, `Done! Imported ${playlist.tracks.length} tracks.`);
-        this.showToast(`🎉 Imported "${playlist.title}" with ${playlist.tracks.length} songs!`);
+        this.showToast(`🎉 Imported "${playlistTitle}" with ${playlist.tracks.length} songs!`);
+
+        if (window.RemoteBridge) {
+          window.RemoteBridge.send({
+            type: 'IMPORT_ACK',
+            status: 'SUCCESS',
+            playlistName: playlistTitle,
+            trackCount: playlist.tracks.length,
+            time: Date.now()
+          });
+        }
         
         setTimeout(() => {
           this.closeImportModal();
@@ -1988,9 +1995,19 @@ class UIViewController {
       console.error('Playlist import failed:', err);
       if (statusText) statusText.textContent = 'Import failed: ' + (err.message || 'Unknown error');
       this.showToast('❌ Import error: ' + (err.message || 'Check URL'));
+
+      if (window.RemoteBridge) {
+        window.RemoteBridge.send({
+          type: 'IMPORT_ACK',
+          status: 'ERROR',
+          error: err.message || 'Import failed',
+          time: Date.now()
+        });
+      }
+
       setTimeout(() => {
         if (progressBox) progressBox.style.display = 'none';
-      }, 3000);
+      }, 3500);
     }
   }
 

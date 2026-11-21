@@ -1,11 +1,11 @@
 {
   "version": "1.3.9",
-  "build": 160,
+  "build": 165,
   "releaseDate": "2026-11-21",
   "minTizenVersion": "3.0",
   "updateUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/version.json",
   "bundleBaseUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/",
-  "changelog": "Instant WebSocket RemoteBridge via HiveMQ/EMQX, eliminated ntfy 429 rate limit errors, fixed Jukebox Party URL, real-time import & vocal handshake.",
+  "changelog": "Fixed Apple Music & Spotify playlist import end-to-end, multi-stage parser (iTunes API + LD-JSON), Library auto-render, and phone import ack.",
   "files": [
     "index.html",
     "mic.html",

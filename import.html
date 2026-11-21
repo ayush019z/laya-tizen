@@ -229,14 +229,29 @@
           badge.className = 'badge connected';
           badge.textContent = '🟢 TV LINKED (' + roomCode + ')';
         } else if (data.type === 'IMPORT_ACK') {
-          submitBtn.style.background = '#4ade80';
-          submitLabel.textContent = '✅ Sent Successfully!';
-          resultBox.style.display = 'block';
-          input.value = '';
-          setTimeout(() => {
-            submitBtn.style.background = 'linear-gradient(135deg, #1db954 0%, #1ed760 100%)';
-            submitLabel.textContent = 'Send Another Playlist';
-          }, 3000);
+          if (data.status === 'SUCCESS') {
+            submitBtn.style.background = '#4ade80';
+            submitLabel.textContent = `✅ Imported ${data.trackCount ? '(' + data.trackCount + ' songs)' : 'Successfully'}!`;
+            resultBox.innerHTML = `🎉 <strong>Success!</strong> "${data.playlistName || 'Playlist'}" has been added to your TV Library.`;
+            resultBox.style.display = 'block';
+            input.value = '';
+            setTimeout(() => {
+              submitBtn.style.background = 'linear-gradient(135deg, #1db954 0%, #1ed760 100%)';
+              submitLabel.textContent = 'Send Another Playlist';
+            }, 4000);
+          } else if (data.status === 'ERROR') {
+            submitBtn.style.background = '#ef4444';
+            submitLabel.textContent = '❌ Import failed on TV';
+            resultBox.innerHTML = `⚠️ <strong>Error on TV:</strong> ${data.error || 'Could not parse playlist'}. Please verify link or paste song titles.`;
+            resultBox.style.display = 'block';
+            setTimeout(() => {
+              submitBtn.style.background = 'linear-gradient(135deg, #1db954 0%, #1ed760 100%)';
+              submitLabel.textContent = 'Send to TV';
+            }, 4000);
+          } else {
+            submitBtn.style.background = '#38bdf8';
+            submitLabel.textContent = '⏳ TV is importing songs...';
+          }
         }
       });
     }
