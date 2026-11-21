@@ -1,11 +1,11 @@
 {
   "version": "1.3.9",
-  "build": 175,
+  "build": 180,
   "releaseDate": "2026-11-22",
   "minTizenVersion": "3.0",
   "updateUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/version.json",
   "bundleBaseUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/",
-  "changelog": "Added dedicated playlist view with full controls & song removal, fixed premature 'Live' status on Karaoke Mic, expanded Party Jukebox to 26 hits with global real-time web search.",
+  "changelog": "Smart song matching for Apple Music imports, revamped neon audio spectrum visualizer, native WebRTC live wireless mic audio streaming to TV speakers.",
   "files": [
     "index.html",
     "mic.html",

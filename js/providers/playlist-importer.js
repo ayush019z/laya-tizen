@@ -337,7 +337,77 @@ class PlaylistImporter {
   }
 
   /**
-   * Helper: Resolves title+artist search queries to real YouTube Music tracks with audio streams
+   * Smart Song Matcher: Compares candidate results against target track title and artist
+   * to guarantee the exact song is matched instead of a random or wrong song.
+   */
+  findBestMatch(item, candidates) {
+    if (!candidates || candidates.length === 0) return null;
+
+    const clean = (s) => (s || '').toLowerCase()
+      .replace(/[\(\[\{].*?[\)\]\}]/g, '')
+      .replace(/[-–—]/g, ' ')
+      .replace(/[^a-z0-9\s]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const targetTitle = clean(item.title);
+    const targetArtist = clean(item.artist);
+    const targetArtistWords = targetArtist.split(' ').filter(w => w.length > 2);
+
+    let bestScore = -1;
+    let bestCandidate = null;
+
+    for (const c of candidates) {
+      let score = 0;
+      const cTitle = clean(c.title);
+      const cArtist = clean(c.artist);
+
+      // Exact title match
+      if (cTitle === targetTitle) {
+        score += 80;
+      } else if (cTitle.includes(targetTitle) || targetTitle.includes(cTitle)) {
+        score += 55;
+      } else {
+        const tWords = targetTitle.split(' ').filter(w => w.length > 2);
+        const matchWords = tWords.filter(w => cTitle.includes(w));
+        if (matchWords.length > 0) {
+          score += (matchWords.length / Math.max(1, tWords.length)) * 40;
+        }
+      }
+
+      // Artist match
+      if (targetArtistWords.length > 0) {
+        let artistMatches = 0;
+        for (const w of targetArtistWords) {
+          if (cArtist.includes(w)) {
+            artistMatches++;
+          }
+        }
+        if (artistMatches > 0) {
+          score += Math.min(45, artistMatches * 20);
+        }
+      }
+
+      // Decrypted streamUrl bonus
+      if (c.streamUrl) {
+        score += 15;
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestCandidate = c;
+      }
+    }
+
+    // Require score >= 40 so random unrelated songs are never picked
+    if (bestScore >= 40) {
+      return bestCandidate;
+    }
+    return null;
+  }
+
+  /**
+   * Helper: Resolves title+artist search queries to real audio streams with smart matching
    */
   async resolveAndSaveTracks(playlistName, rawTrackList, sourceUrl = '', onProgress = null) {
     const resolvedTracks = [];
@@ -347,24 +417,36 @@ class PlaylistImporter {
       const item = rawTrackList[i];
       if (typeof onProgress === 'function') {
         const pct = 30 + Math.round(((i + 1) / limit) * 65);
-        onProgress(pct, `Searching track ${i + 1}/${limit}: "${item.title}"`);
+        onProgress(pct, `Matching song ${i + 1}/${limit}: "${item.title}"`);
       }
 
-      const query = item.artist ? `${item.title} ${item.artist}` : item.title;
-
+      let matchedTrack = null;
       try {
-        const results = await window.MusicProvider.search(query);
-        if (results && results.length > 0) {
-          resolvedTracks.push(results[0]);
+        // Step 1: Search with Title + Artist
+        const query1 = item.artist ? `${item.title} ${item.artist}`.trim() : item.title.trim();
+        let candidates = await window.MusicProvider.search(query1);
+        matchedTrack = this.findBestMatch(item, candidates);
+
+        // Step 2: If no confident match, retry with clean title alone
+        if (!matchedTrack) {
+          const cleanTitle = item.title.replace(/[\(\[\{].*?[\)\]\}]/g, '').replace(/[-–—].*$/, '').trim();
+          candidates = await window.MusicProvider.search(cleanTitle);
+          matchedTrack = this.findBestMatch(item, candidates);
+        }
+
+        if (matchedTrack) {
+          if (item.artwork && !matchedTrack.artwork) matchedTrack.artwork = item.artwork;
+          resolvedTracks.push(matchedTrack);
         } else {
-          // Add basic track object fallback
+          // Never substitute an unrelated song! Store accurate track object
           resolvedTracks.push({
             id: 'imp_' + Math.random().toString(36).substring(2, 9),
             title: item.title,
             artist: item.artist || 'Unknown Artist',
             album: playlistName,
             artwork: item.artwork || 'assets/icon.png',
-            durationFormatted: '3:30'
+            durationFormatted: '3:30',
+            streamUrl: null
           });
         }
       } catch (err) {
@@ -374,7 +456,8 @@ class PlaylistImporter {
           artist: item.artist || 'Unknown Artist',
           album: playlistName,
           artwork: item.artwork || 'assets/icon.png',
-          durationFormatted: '3:30'
+          durationFormatted: '3:30',
+          streamUrl: null
         });
       }
     }

@@ -330,7 +330,7 @@
     let micStream = null;
     let analyser = null;
     let animId = null;
-    let phonePeer = null;
+    let phonePeerConnection = null;
 
     const micBtn = document.getElementById('mic-btn');
     const micLabel = document.getElementById('mic-label');
@@ -345,9 +345,29 @@
 
     // 1. Initialize Real-Time Remote Bridge (SSE & WebSockets)
     if (window.RemoteBridge) {
-      window.RemoteBridge.initMobile(roomCode, (data) => {
+      window.RemoteBridge.initMobile(roomCode, async (data) => {
         if (data.type === 'TV_ACK') {
           onTVConnected();
+        } else if (data.type === 'RTC_ANSWER') {
+          if (phonePeerConnection && data.sdp) {
+            try {
+              const RTCSD = window.RTCSessionDescription || window.webkitRTCSessionDescription;
+              await phonePeerConnection.setRemoteDescription(new RTCSD(data.sdp));
+              console.log('[WebRTC] TV Answer acknowledged! Audio streaming live to TV.');
+              footerHint.textContent = '🎉 Your voice is now coming through the TV speakers! Sing along!';
+            } catch (err) {
+              console.warn('[WebRTC] setRemoteDescription error:', err);
+            }
+          }
+        } else if (data.type === 'RTC_ICE') {
+          if (phonePeerConnection && data.candidate) {
+            try {
+              const RTCIC = window.RTCIceCandidate || window.webkitRTCIceCandidate;
+              await phonePeerConnection.addIceCandidate(new RTCIC(data.candidate));
+            } catch (err) {
+              console.warn('[WebRTC] addIceCandidate error:', err);
+            }
+          }
         }
       }, 'mic');
     }
@@ -447,19 +467,53 @@
         sendMicState(true);
         runVUMeter();
 
-        // WebRTC live audio stream to TV
+        // Native WebRTC Ultra-Low Latency Audio Streaming directly to TV Speakers
         try {
-          if (window.Peer) {
-            if (!phonePeer) phonePeer = new Peer();
-            phonePeer.on('open', () => {
-              phonePeer.call('layatv-' + roomCode, stream);
-            });
-            if (phonePeer.id) {
-              phonePeer.call('layatv-' + roomCode, stream);
+          const RTCPC = window.RTCPeerConnection || window.webkitRTCPeerConnection;
+          if (RTCPC) {
+            if (phonePeerConnection) {
+              try { phonePeerConnection.close(); } catch(e){}
             }
+            phonePeerConnection = new RTCPC({
+              iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' }
+              ]
+            });
+
+            // Stream high quality microphone tracks
+            stream.getAudioTracks().forEach(track => {
+              phonePeerConnection.addTrack(track, stream);
+            });
+
+            phonePeerConnection.onicecandidate = (e) => {
+              if (e.candidate && window.RemoteBridge) {
+                window.RemoteBridge.send({
+                  type: 'RTC_ICE',
+                  candidate: e.candidate,
+                  room: roomCode
+                });
+              }
+            };
+
+            const offer = await phonePeerConnection.createOffer({
+              offerToReceiveAudio: false,
+              offerToReceiveVideo: false
+            });
+            await phonePeerConnection.setLocalDescription(offer);
+
+            if (window.RemoteBridge) {
+              window.RemoteBridge.send({
+                type: 'RTC_OFFER',
+                sdp: offer,
+                room: roomCode
+              });
+            }
+            console.log('[WebRTC] Initiated audio call to TV with SDP offer');
           }
         } catch (e) {
-          console.warn('WebRTC audio call:', e);
+          console.warn('[WebRTC] audio call error:', e);
         }
       } catch (err) {
         alert('Microphone permission required: ' + err.message);
@@ -467,6 +521,10 @@
     }
 
     function stopMic() {
+      if (phonePeerConnection) {
+        try { phonePeerConnection.close(); } catch(e){}
+        phonePeerConnection = null;
+      }
       if (micStream) micStream.getTracks().forEach(t => t.stop());
       if (audioCtx) audioCtx.close();
       cancelAnimationFrame(animId);

@@ -941,7 +941,7 @@ html, body {
   border-radius: 34px;
   pointer-events: none;
   opacity: 0;
-  background: rgba(10, 10, 16, 0.78);
+  background: transparent;
   transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   z-index: 5;
 }

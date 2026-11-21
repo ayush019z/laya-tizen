@@ -67,14 +67,12 @@ class AudioController {
       await this.audio.play();
       this.isPlaying = true;
     } catch (err) {
-      console.warn('[AudioController] Play failed, retrying fallback:', err);
-      this.audio.src = 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3';
-      try {
-        await this.audio.play();
-        this.isPlaying = true;
-      } catch (e) {
-        console.error('[AudioController] Playback error:', e);
+      console.warn('[AudioController] Play failed for track:', err);
+      if (window.UIController) {
+        window.UIController.showToast(`⚠️ Could not load audio for "${track.title}" - skipping to next`);
       }
+      setTimeout(() => this.playNext(), 1500);
+      return;
     }
 
     // 3. Load Apple-Style Word-Synced Lyrics via LRCLIB / Service

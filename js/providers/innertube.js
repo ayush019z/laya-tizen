@@ -505,21 +505,30 @@ class MusicProvider {
       }
     }
 
-    // For YouTube tracks, resolve stream via audio track match on high-bitrate CDN
+    // Try finding the exact song on JioSaavn using clean search terms
+    const cleanTitle = (track.title || '').replace(/[\(\[\{].*?[\)\]\}]/g, '').replace(/[-–—].*$/, '').trim();
+    const cleanArtist = (track.artist || '').split(/[,&/]/)[0].trim();
     const searchTerms = [
-      `${track.title} ${track.artist}`.replace(/[\(\[\{].*?[\)\]\}]/g, '').trim(),
-      track.title.replace(/[\(\[\{].*?[\)\]\}]/g, '').trim()
-    ];
+      `${cleanTitle} ${cleanArtist}`.trim(),
+      cleanTitle
+    ].filter(Boolean);
 
     for (const term of searchTerms) {
       try {
-        const saavnUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&api_version=4&ctx=web6dot0&n=5&p=1&q=${encodeURIComponent(term)}`;
-        const res = await fetch(saavnUrl, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(3000) });
+        const saavnUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&api_version=4&ctx=web6dot0&n=10&p=1&q=${encodeURIComponent(term)}`;
+        const res = await fetch(saavnUrl, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(3500) });
         if (res.ok) {
           const data = await res.json();
           if (data && data.results && data.results.length > 0) {
-            for (const s of data.results) {
-              const stream = this.decryptMediaUrl(s.more_info?.encrypted_media_url);
+            // Find candidate whose title actually matches cleanTitle
+            const match = data.results.find(s => {
+              const sTitle = (s.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+              const target = cleanTitle.toLowerCase().replace(/[^a-z0-9]/g, '');
+              return sTitle.includes(target) || target.includes(sTitle);
+            }) || data.results[0];
+
+            if (match) {
+              const stream = this.decryptMediaUrl(match.more_info?.encrypted_media_url);
               if (stream) {
                 track.streamUrl = stream;
                 return stream;
@@ -532,8 +541,7 @@ class MusicProvider {
       }
     }
 
-    // High fidelity curated fallback
-    return this.curatedCatalogue[0]?.streamUrl || 'https://aac.saavncdn.com/430/5c5ea5cc00e3bff45616013226f376fe_160.mp4';
+    throw new Error(`Audio stream could not be found for "${track.title}"`);
   }
 
   /**

@@ -1049,6 +1049,10 @@ class UIViewController {
   runVisualizerLoop() {
     if (!this.isVisualizerActive) return;
 
+    if (!this.visualizerPeaks) {
+      this.visualizerPeaks = new Array(24).fill(0);
+    }
+
     const draw = () => {
       if (!this.isVisualizerActive) return;
 
@@ -1065,32 +1069,67 @@ class UIViewController {
       const data = window.AudioDSP ? window.AudioDSP.getFrequencyData() : null;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      if (data && data.length > 0 && window.AudioPlayer && window.AudioPlayer.isPlaying) {
-        const bars = 20;
-        const barWidth = 12;
-        const spacing = (canvas.width - (bars * barWidth)) / (bars + 1);
-        const centerY = canvas.height / 2;
+      const isPlaying = window.AudioPlayer && window.AudioPlayer.isPlaying && !window.AudioPlayer.audio.paused;
 
-        for (let i = 0; i < bars; i++) {
-          const val = data[i] || 0;
-          const barHeight = Math.max(8, (val / 255) * 160);
-          const x = spacing + i * (barWidth + spacing);
-          const y = centerY - barHeight / 2;
+      const bars = 24;
+      const padding = 16;
+      const availableWidth = canvas.width - (padding * 2);
+      const barWidth = Math.floor(availableWidth / bars) - 4;
+      const spacing = 4;
+      const baseY = canvas.height - 24;
+      const maxBarHeight = 150;
 
-          const grad = ctx.createLinearGradient(0, y, 0, y + barHeight);
-          grad.addColorStop(0, '#ffffff');
-          grad.addColorStop(0.5, '#ff2a6d');
-          grad.addColorStop(1, '#8a2387');
+      // Check if real frequency data is available from DSP
+      const hasRealEnergy = data && data.length >= bars && data.some(v => v > 8);
+      const timeMs = performance.now();
 
-          ctx.fillStyle = grad;
-          ctx.beginPath();
-          if (ctx.roundRect) {
-            ctx.roundRect(x, y, barWidth, barHeight, 5);
+      for (let i = 0; i < bars; i++) {
+        let val = 0;
+        if (isPlaying) {
+          if (hasRealEnergy) {
+            val = data[i] || 0;
           } else {
-            ctx.rect(x, y, barWidth, barHeight);
+            // Adaptive harmonic visualizer synthesis when CORS restricts raw frequency byte arrays
+            const t = timeMs * 0.0035;
+            const bass = Math.sin(t * 3.8) * 0.5 + 0.5;
+            const mid = Math.cos(t * 5.6 + i * 0.28) * 0.5 + 0.5;
+            const treble = Math.sin(t * 9.2 + i * 0.45) * 0.5 + 0.5;
+            const freqCurve = 1.0 - (i / bars) * 0.4;
+            const beatPulse = (i < 8) ? (bass * 0.75 + mid * 0.25) : (mid * 0.55 + treble * 0.45);
+            val = Math.floor(beatPulse * freqCurve * 210 + 20);
           }
-          ctx.fill();
         }
+
+        const barHeight = Math.max(6, (val / 255) * maxBarHeight);
+        const x = padding + i * (barWidth + spacing);
+        const y = baseY - barHeight;
+
+        // Peak drop physics
+        if (barHeight > (this.visualizerPeaks[i] || 0)) {
+          this.visualizerPeaks[i] = barHeight;
+        } else {
+          this.visualizerPeaks[i] = Math.max(6, (this.visualizerPeaks[i] || 6) - 1.8);
+        }
+
+        // Draw ambient glow bar
+        const grad = ctx.createLinearGradient(0, baseY, 0, y);
+        grad.addColorStop(0, 'rgba(0, 242, 254, 0.4)');
+        grad.addColorStop(0.5, 'rgba(255, 42, 109, 0.85)');
+        grad.addColorStop(1, '#ffffff');
+
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        if (ctx.roundRect) {
+          ctx.roundRect(x, y, barWidth, barHeight, [4, 4, 0, 0]);
+        } else {
+          ctx.rect(x, y, barWidth, barHeight);
+        }
+        ctx.fill();
+
+        // Draw floating peak cap
+        const peakY = baseY - (this.visualizerPeaks[i] || 6) - 3;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(x, peakY, barWidth, 2);
       }
 
       requestAnimationFrame(draw);
@@ -2005,6 +2044,8 @@ class UIViewController {
           if (onscreenText) onscreenText.textContent = '🔴 Phone Singing Live!';
         }
         this.showToast('🎤 Mobile Mic is now LIVE!');
+        const liveAudio = document.getElementById('tv-live-mic-audio');
+        if (liveAudio) liveAudio.muted = false;
       } else {
         if (statusPill) {
           statusPill.className = 'mic-status-pill connected';
@@ -2014,14 +2055,92 @@ class UIViewController {
           onscreenPill.className = 'karaoke-mic-status-pill connected';
           if (onscreenText) onscreenText.textContent = 'Phone Linked (Muted)';
         }
+        const liveAudio = document.getElementById('tv-live-mic-audio');
+        if (liveAudio) liveAudio.muted = true;
       }
 
       if (window.AudioDSP) {
-        if (data.volume !== undefined && window.AudioDSP.micGain) {
-          window.AudioDSP.micGain.gain.value = data.volume;
+        if (data.volume !== undefined) {
+          if (window.AudioDSP.setMicGain) window.AudioDSP.setMicGain(data.volume * 1.5);
+          const liveAudio = document.getElementById('tv-live-mic-audio');
+          if (liveAudio) liveAudio.volume = Math.min(1.0, data.volume);
         }
-        if (data.echo !== undefined) {
+        if (data.echo !== undefined && window.AudioDSP.setMicEcho) {
           window.AudioDSP.setMicEcho(data.echo);
+        }
+      }
+    } else if (data.type === 'RTC_OFFER') {
+      try {
+        const RTCPC = window.RTCPeerConnection || window.webkitRTCPeerConnection;
+        if (RTCPC && data.sdp) {
+          if (this.tvPeerConnection) {
+            try { this.tvPeerConnection.close(); } catch(e){}
+          }
+          this.tvPeerConnection = new RTCPC({
+            iceServers: [
+              { urls: 'stun:stun.l.google.com:19302' },
+              { urls: 'stun:stun1.l.google.com:19302' },
+              { urls: 'stun:stun2.l.google.com:19302' }
+            ]
+          });
+
+          this.tvPeerConnection.onicecandidate = (e) => {
+            if (e.candidate && window.RemoteBridge) {
+              window.RemoteBridge.send({
+                type: 'RTC_ICE',
+                candidate: e.candidate,
+                room: code
+              });
+            }
+          };
+
+          this.tvPeerConnection.ontrack = (event) => {
+            console.log('[WebRTC] Received live audio stream from phone mic!');
+            const stream = event.streams[0];
+
+            let audioEl = document.getElementById('tv-live-mic-audio');
+            if (!audioEl) {
+              audioEl = document.createElement('audio');
+              audioEl.id = 'tv-live-mic-audio';
+              audioEl.autoplay = true;
+              audioEl.playsInline = true;
+              document.body.appendChild(audioEl);
+            }
+            audioEl.srcObject = stream;
+            audioEl.muted = false;
+            audioEl.volume = 1.0;
+            audioEl.play().catch(err => console.warn('[WebRTC] audio play error:', err));
+
+            if (window.AudioDSP) {
+              window.AudioDSP.attachMicrophoneStream(stream);
+            }
+            this.showToast('🎤 Voice connected to TV speakers! Sing along!');
+          };
+
+          const RTCSD = window.RTCSessionDescription || window.webkitRTCSessionDescription;
+          await this.tvPeerConnection.setRemoteDescription(new RTCSD(data.sdp));
+          const answer = await this.tvPeerConnection.createAnswer();
+          await this.tvPeerConnection.setLocalDescription(answer);
+
+          if (window.RemoteBridge) {
+            window.RemoteBridge.send({
+              type: 'RTC_ANSWER',
+              sdp: answer,
+              room: code
+            });
+          }
+          console.log('[WebRTC] TV answer sent to phone');
+        }
+      } catch (err) {
+        console.warn('[WebRTC] Error handling RTC_OFFER on TV:', err);
+      }
+    } else if (data.type === 'RTC_ICE') {
+      if (this.tvPeerConnection && data.candidate) {
+        try {
+          const RTCIC = window.RTCIceCandidate || window.webkitRTCIceCandidate;
+          await this.tvPeerConnection.addIceCandidate(new RTCIC(data.candidate));
+        } catch (e) {
+          console.warn('[WebRTC] ICE candidate error on TV:', e);
         }
       }
     } else if (data.type === 'PLAYLIST_IMPORT') {
