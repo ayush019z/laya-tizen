@@ -1,11 +1,11 @@
 {
-  "version": "1.4.0",
-  "build": 185,
+  "version": "1.4.1",
+  "build": 190,
   "releaseDate": "2026-11-22",
   "minTizenVersion": "3.0",
   "updateUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/version.json",
   "bundleBaseUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/",
-  "changelog": "Empty queue on boot, dynamic DOM injection for playlist view (fixes blank screen), dual-host remote bridge for party jukebox queueing.",
+  "changelog": "Syntax error fix, player controls cleanup, default romanised and dual-tone lyrics in Settings, Casio/Bluetooth/USB mic direct TV speaker passthrough, enhanced spatial navigation.",
   "files": [
     "index.html",
     "mic.html",

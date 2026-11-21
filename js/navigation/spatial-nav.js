@@ -60,12 +60,33 @@ class SpatialNavigator {
     element.classList.add('focused');
     try { element.focus(); } catch (e) {}
     
-    // Ensure element is visible in view
-    element.scrollIntoView({
-      behavior: 'smooth',
-      block: 'nearest',
-      inline: 'nearest'
-    });
+    // 1. Horizontal Shelf Container Scrolling (Ensures cards scroll horizontally into view on Tizen)
+    const shelf = element.closest('.shelf-track-container');
+    if (shelf) {
+      const shelfRect = shelf.getBoundingClientRect();
+      const elRect = element.getBoundingClientRect();
+      if (elRect.right > shelfRect.right - 40) {
+        shelf.scrollLeft += (elRect.right - shelfRect.right + 100);
+      } else if (elRect.left < shelfRect.left + 40) {
+        shelf.scrollLeft -= (shelfRect.left - elRect.left + 100);
+      }
+    }
+
+    // 2. Vertical Container Scrolling (Smoothly brings row into viewport)
+    const viewScreen = element.closest('.view-screen.active');
+    if (viewScreen) {
+      const viewRect = viewScreen.getBoundingClientRect();
+      const elRect = element.getBoundingClientRect();
+      if (elRect.bottom > viewRect.bottom - 100) {
+        viewScreen.scrollTop += (elRect.bottom - viewRect.bottom + 140);
+      } else if (elRect.top < viewRect.top + 60) {
+        viewScreen.scrollTop -= (viewRect.top - elRect.top + 80);
+      }
+    } else {
+      try {
+        element.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+      } catch (e) {}
+    }
 
     this.showButtonFocusLabel(element);
   }
@@ -307,13 +328,13 @@ class SpatialNavigator {
 
     switch (dir) {
       case 'left':
-        return toCenter.x < fromCenter.x - 5;
+        return toCenter.x < fromCenter.x - 2;
       case 'right':
-        return toCenter.x > fromCenter.x + 5;
+        return toCenter.x > fromCenter.x + 2;
       case 'up':
-        return toCenter.y < fromCenter.y - 5;
+        return toCenter.y < fromCenter.y - 2;
       case 'down':
-        return toCenter.y > fromCenter.y + 5;
+        return toCenter.y > fromCenter.y + 2;
       default:
         return false;
     }
@@ -326,11 +347,11 @@ class SpatialNavigator {
     const dx = Math.abs(fromCenter.x - toCenter.x);
     const dy = Math.abs(fromCenter.y - toCenter.y);
 
-    // Primary axis vs orthogonal penalty
+    // Primary axis vs orthogonal penalty (balanced to prevent getting stuck between shelves)
     if (dir === 'left' || dir === 'right') {
-      return dx + dy * 2.2;
+      return dx + dy * 1.6;
     } else {
-      return dy + dx * 2.2;
+      return dy + dx * 1.35;
     }
   }
 }

@@ -122,6 +122,23 @@ html, body {
   fill: #000000 !important;
 }
 
+/* Global TV Remote High-Contrast Focus Ring */
+.focusable:focus,
+.focusable.focused,
+button:focus,
+button.focused,
+.media-card:focus,
+.media-card.focused,
+.nav-tab-pill:focus,
+.nav-tab-pill.focused,
+.dock-search-circle:focus,
+.dock-search-circle.focused {
+  outline: 3px solid #ffffff !important;
+  box-shadow: 0 0 24px rgba(255, 255, 255, 0.7), 0 0 45px var(--dynamic-glow) !important;
+  transform: scale(1.06) !important;
+  z-index: 25 !important;
+}
+
 .laya-header-brand {
   display: flex;
   align-items: center;
@@ -1511,17 +1528,40 @@ html, body {
 /* Dual-Script & Romanized Lyrics Subtitle */
 .lrc-dual-script {
   display: block;
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.55);
-  margin-top: 4px;
-  letter-spacing: 0.2px;
-  transition: color 0.3s ease;
+  margin-top: 6px;
+  letter-spacing: 0.3px;
+  transition: all 0.3s ease;
 }
 
 .lrc-line.active .lrc-dual-script {
-  color: rgba(255, 255, 255, 0.88);
+  color: rgba(255, 255, 255, 0.9);
   font-weight: 600;
+}
+
+/* Dual Tone Colored Lyrics (Enabled by Default - Apple Music Style Vibrancy) */
+.dual-tone-lyrics .lrc-line.active .lrc-main-text {
+  color: #ffffff;
+  text-shadow: 0 0 24px rgba(255, 255, 255, 0.75), 0 0 45px var(--dynamic-glow);
+}
+
+.dual-tone-lyrics .lrc-line.active .lrc-dual-script {
+  color: var(--dynamic-accent, #ff2a6d) !important;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-shadow: 0 0 18px var(--dynamic-glow, rgba(255, 42, 109, 0.4));
+}
+
+.dual-tone-lyrics .lrc-word.active-word {
+  color: var(--dynamic-accent, #ff2a6d) !important;
+  font-weight: 800;
+  text-shadow: 0 0 20px var(--dynamic-glow, rgba(255, 42, 109, 0.5));
+}
+
+.dual-tone-lyrics .lrc-line:not(.active) .lrc-dual-script {
+  color: rgba(255, 255, 255, 0.42);
 }
 
 /* Instant Artist Radio Mixes Shelf Cards */

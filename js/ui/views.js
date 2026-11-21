@@ -11,6 +11,9 @@ class UIViewController {
     this.showingQueue = false;
     this.isScreensaverActive = false;
     this.isKaraokeActive = false;
+    this.isDualScriptActive = localStorage.getItem('layatv_romanized_lyrics') !== 'false';
+    this.isDualToneActive = localStorage.getItem('layatv_dual_tone_lyrics') !== 'false';
+    this.isTVMicEnabled = localStorage.getItem('layatv_tv_hardware_mic') !== 'false';
     this.roomCode = 'LAYA-' + Math.floor(1000 + Math.random() * 9000);
     this.screensaverTimer = null;
     this.init();
@@ -36,6 +39,7 @@ class UIViewController {
     this.setupDualScriptToggle();
     this.setupPlaylistImporter();
     this.setupWirelessMic();
+    this.setupTVHardwareMic();
     this.setupRemoteBridge();
     this.setupLyricsSyncControls();
     this.renderHome();
@@ -1151,29 +1155,36 @@ class UIViewController {
   }
 
   setupDualScriptToggle() {
-    this.isDualScriptActive = false;
+    this.isDualScriptActive = localStorage.getItem('layatv_romanized_lyrics') !== 'false';
+    this.isDualToneActive = localStorage.getItem('layatv_dual_tone_lyrics') !== 'false';
   }
 
   toggleDualLyrics() {
     this.isDualScriptActive = !this.isDualScriptActive;
-    const btn = document.getElementById('btn-toggle-dual-lyrics');
-    if (btn) btn.classList.toggle('active', this.isDualScriptActive);
-    this.showToast(this.isDualScriptActive ? 'Dual-Script Sing-Along Active' : 'Standard Lyrics View');
+    localStorage.setItem('layatv_romanized_lyrics', String(this.isDualScriptActive));
+    this.showToast(this.isDualScriptActive ? 'Romanised Lyrics: Active' : 'Standard Lyrics View');
     this.renderLyrics(window.AudioPlayer?.currentLyrics || []);
   }
 
   transliterateDevanagariToLatin(text) {
     if (!text) return '';
-    if (!/[\u0900-\u097F]/.test(text)) return '';
+    // Support Devanagari (\u0900-\u097F) and Gurmukhi / Punjabi (\u0A00-\u0A7F)
+    if (!/[\u0900-\u097F\u0A00-\u0A7F]/.test(text)) return '';
 
     const vowels = {
+      // Devanagari
       'अ': 'a', 'आ': 'aa', 'इ': 'i', 'ई': 'ee', 'उ': 'u', 'ऊ': 'oo', 'ऋ': 'ri',
       'ए': 'e', 'ऐ': 'ai', 'ओ': 'o', 'औ': 'au', 'अं': 'am', 'अः': 'ah',
       'ा': 'aa', 'ि': 'i', 'ी': 'ee', 'ु': 'u', 'ू': 'oo', 'ृ': 'ri',
-      'े': 'e', 'ै': 'ai', 'ो': 'o', 'ौ': 'au', 'ं': 'n', 'ँ': 'n', 'ः': 'h', '्': ''
+      'े': 'e', 'ै': 'ai', 'ो': 'o', 'ौ': 'au', 'ं': 'n', 'ँ': 'n', 'ः': 'h', '्': '',
+      // Gurmukhi / Punjabi
+      'ਅ': 'a', 'ਆ': 'aa', 'ਇ': 'i', 'ਈ': 'ee', 'ਉ': 'u', 'ਊ': 'oo',
+      'ਏ': 'e', 'ਐ': 'ai', 'ਓ': 'o', 'ਔ': 'au',
+      'ਾ': 'aa', 'ਿ': 'i', 'ੀ': 'ee', 'ੁ': 'u', 'ੂ': 'oo', 'ੇ': 'e', 'ੈ': 'ai', 'ੋ': 'o', 'ੌ': 'au', 'ਂ': 'n', 'ੰ': 'n', '੍': ''
     };
 
     const consonants = {
+      // Devanagari
       'क': 'k', 'ख': 'kh', 'ग': 'g', 'घ': 'gh', 'ङ': 'ng',
       'च': 'ch', 'छ': 'chh', 'ज': 'j', 'झ': 'jh', 'ञ': 'ny',
       'ट': 't', 'ठ': 'th', 'ड': 'd', 'ढ': 'dh', 'ण': 'n',
@@ -1181,7 +1192,15 @@ class UIViewController {
       'प': 'p', 'फ': 'ph', 'ब': 'b', 'भ': 'bh', 'म': 'm',
       'य': 'y', 'र': 'r', 'ल': 'l', 'व': 'v',
       'श': 'sh', 'ष': 'sh', 'स': 's', 'ह': 'h',
-      'ड़': 'r', 'ढ़': 'rh', 'फ़': 'f', 'ज़': 'z', 'क़': 'q', 'ख़': 'kh', 'ग़': 'gh'
+      'ड़': 'r', 'ढ़': 'rh', 'फ़': 'f', 'ज़': 'z', 'क़': 'q', 'ख़': 'kh', 'ग़': 'gh',
+      // Gurmukhi / Punjabi
+      'ਕ': 'k', 'ਖ': 'kh', 'ਗ': 'g', 'ਘ': 'gh', 'ਙ': 'ng',
+      'ਚ': 'ch', 'ਛ': 'chh', 'ਜ': 'j', 'ਝ': 'jh', 'ਞ': 'ny',
+      'ਟ': 't', 'ਠ': 'th', 'ਡ': 'd', 'ਢ': 'dh', 'ਣ': 'n',
+      'ਤ': 't', 'ਥ': 'th', 'ਦ': 'd', 'ਧ': 'dh', 'ਨ': 'n',
+      'ਪ': 'p', 'ਫ': 'ph', 'ਬ': 'b', 'ਭ': 'bh', 'ਮ': 'm',
+      'ਯ': 'y', 'ਰ': 'r', 'ਲ': 'l', 'ਵ': 'v', 'ੜ': 'r',
+      'ਸ਼': 'sh', 'ਸ': 's', 'ਹ': 'h'
     };
 
     let result = '';
@@ -1191,7 +1210,7 @@ class UIViewController {
       if (consonants[ch]) {
         result += consonants[ch];
         const next = chars[i + 1];
-        if (!next || (!vowels[next] && next !== '्' && !consonants[next])) {
+        if (!next || (!vowels[next] && next !== '्' && next !== '੍' && !consonants[next])) {
           result += 'a';
         } else if (consonants[next]) {
           result += 'a';
@@ -1545,6 +1564,11 @@ class UIViewController {
     const fsPlayer = document.getElementById('fullscreen-player');
     if (fsPlayer) {
       fsPlayer.classList.add('active');
+      if (this.isDualToneActive) {
+        fsPlayer.classList.add('dual-tone-lyrics');
+      } else {
+        fsPlayer.classList.remove('dual-tone-lyrics');
+      }
       const favBtn = document.getElementById('btn-fav-track');
       if (favBtn && window.AudioPlayer.currentTrack) {
         const isLiked = window.Library.isFavorite(window.AudioPlayer.currentTrack.id);
@@ -1637,7 +1661,176 @@ class UIViewController {
       }
     });
 
+    // 1. Romanised Lyrics Toggle
+    const romOn = document.getElementById('btn-setting-romanized-on');
+    const romOff = document.getElementById('btn-setting-romanized-off');
+    if (romOn && romOff) {
+      romOn.classList.toggle('active', this.isDualScriptActive);
+      romOff.classList.toggle('active', !this.isDualScriptActive);
+      if (!romOn._bound) {
+        romOn._bound = true;
+        romOn.addEventListener('click', () => {
+          this.isDualScriptActive = true;
+          localStorage.setItem('layatv_romanized_lyrics', 'true');
+          romOn.classList.add('active');
+          romOff.classList.remove('active');
+          this.showToast('Romanised Lyrics: ON');
+          this.renderLyrics(window.AudioPlayer?.currentLyrics || []);
+        });
+      }
+      if (!romOff._bound) {
+        romOff._bound = true;
+        romOff.addEventListener('click', () => {
+          this.isDualScriptActive = false;
+          localStorage.setItem('layatv_romanized_lyrics', 'false');
+          romOff.classList.add('active');
+          romOn.classList.remove('active');
+          this.showToast('Romanised Lyrics: OFF');
+          this.renderLyrics(window.AudioPlayer?.currentLyrics || []);
+        });
+      }
+    }
+
+    // 2. Dual-Tone Colored Lyrics Toggle
+    const dtOn = document.getElementById('btn-setting-dualtone-on');
+    const dtOff = document.getElementById('btn-setting-dualtone-off');
+    if (dtOn && dtOff) {
+      dtOn.classList.toggle('active', this.isDualToneActive);
+      dtOff.classList.toggle('active', !this.isDualToneActive);
+      if (!dtOn._bound) {
+        dtOn._bound = true;
+        dtOn.addEventListener('click', () => {
+          this.isDualToneActive = true;
+          localStorage.setItem('layatv_dual_tone_lyrics', 'true');
+          dtOn.classList.add('active');
+          dtOff.classList.remove('active');
+          const fsPlayer = document.getElementById('fullscreen-player');
+          if (fsPlayer) fsPlayer.classList.add('dual-tone-lyrics');
+          this.showToast('Dual Tone Lyrics: ON');
+        });
+      }
+      if (!dtOff._bound) {
+        dtOff._bound = true;
+        dtOff.addEventListener('click', () => {
+          this.isDualToneActive = false;
+          localStorage.setItem('layatv_dual_tone_lyrics', 'false');
+          dtOff.classList.add('active');
+          dtOn.classList.remove('active');
+          const fsPlayer = document.getElementById('fullscreen-player');
+          if (fsPlayer) fsPlayer.classList.remove('dual-tone-lyrics');
+          this.showToast('Dual Tone Lyrics: OFF');
+        });
+      }
+    }
+
+    // 3. TV Hardware Mic Passthrough (Casio / Bluetooth / USB) Toggle
+    const micOn = document.getElementById('btn-setting-tvmic-on');
+    const micOff = document.getElementById('btn-setting-tvmic-off');
+    if (micOn && micOff) {
+      micOn.classList.toggle('active', this.isTVMicEnabled);
+      micOff.classList.toggle('active', !this.isTVMicEnabled);
+      if (!micOn._bound) {
+        micOn._bound = true;
+        micOn.addEventListener('click', () => {
+          this.isTVMicEnabled = true;
+          localStorage.setItem('layatv_tv_hardware_mic', 'true');
+          micOn.classList.add('active');
+          micOff.classList.remove('active');
+          this.setupTVHardwareMic();
+          this.showToast('TV Hardware Mic: ON (Passthrough to TV Speakers)');
+        });
+      }
+      if (!micOff._bound) {
+        micOff._bound = true;
+        micOff.addEventListener('click', () => {
+          this.isTVMicEnabled = false;
+          localStorage.setItem('layatv_tv_hardware_mic', 'false');
+          micOff.classList.add('active');
+          micOn.classList.remove('active');
+          if (window.AudioDSP) window.AudioDSP.detachMicrophoneStream();
+          this.showToast('TV Hardware Mic: OFF');
+        });
+      }
+    }
+
+    // 4. Lyrics Timing Calibration
+    const syncText = document.getElementById('setting-sync-offset-text');
+    const updateSyncDisplay = () => {
+      const track = window.AudioPlayer ? window.AudioPlayer.currentTrack : null;
+      const current = this.getTrackLyricsOffset(track);
+      if (syncText) syncText.textContent = `${current > 0 ? '+' : ''}${current.toFixed(1)}s`;
+    };
+    updateSyncDisplay();
+
+    const syncEarlier = document.getElementById('btn-setting-sync-earlier');
+    if (syncEarlier && !syncEarlier._bound) {
+      syncEarlier._bound = true;
+      syncEarlier.addEventListener('click', () => {
+        const track = window.AudioPlayer ? window.AudioPlayer.currentTrack : null;
+        const current = this.getTrackLyricsOffset(track);
+        const next = Math.round((current - 0.5) * 10) / 10;
+        this.setTrackLyricsOffset(track, next);
+        updateSyncDisplay();
+        this.showToast(`Lyrics Timing: ${next > 0 ? '+' : ''}${next.toFixed(1)}s`);
+      });
+    }
+
+    const syncLater = document.getElementById('btn-setting-sync-later');
+    if (syncLater && !syncLater._bound) {
+      syncLater._bound = true;
+      syncLater.addEventListener('click', () => {
+        const track = window.AudioPlayer ? window.AudioPlayer.currentTrack : null;
+        const current = this.getTrackLyricsOffset(track);
+        const next = Math.round((current + 0.5) * 10) / 10;
+        this.setTrackLyricsOffset(track, next);
+        updateSyncDisplay();
+        this.showToast(`Lyrics Timing: ${next > 0 ? '+' : ''}${next.toFixed(1)}s`);
+      });
+    }
+
+    const syncReset = document.getElementById('btn-setting-sync-reset');
+    if (syncReset && !syncReset._bound) {
+      syncReset._bound = true;
+      syncReset.addEventListener('click', () => {
+        const track = window.AudioPlayer ? window.AudioPlayer.currentTrack : null;
+        this.setTrackLyricsOffset(track, 0.0);
+        updateSyncDisplay();
+        this.showToast('Lyrics Timing Reset to 0.0s');
+      });
+    }
+
     this.refreshStatsTable();
+  }
+
+  setupTVHardwareMic() {
+    if (!this.isTVMicEnabled) return;
+    try {
+      const handleStream = (stream) => {
+        this.tvMicStream = stream;
+        if (window.AudioDSP && window.AudioDSP.attachMicrophoneStream) {
+          window.AudioDSP.attachMicrophoneStream(stream);
+        }
+        console.log('[TVMic] Casio/Hardware Mic attached directly to TV speakers!');
+        this.showToast('🎤 TV Hardware Mic LIVE through TV speakers!');
+      };
+
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ audio: true })
+          .then(handleStream)
+          .catch(err => console.warn('[TVMic] getUserMedia error:', err));
+      } else {
+        const gum = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+        if (gum) {
+          gum.call(navigator, { audio: true }, handleStream, (err) => {
+            console.warn('[TVMic] legacy getUserMedia error:', err);
+          });
+        } else {
+          console.warn('[TVMic] getUserMedia not supported on this TV runtime');
+        }
+      }
+    } catch (err) {
+      console.warn('[TVMic] Exception in setupTVHardwareMic:', err);
+    }
   }
 
   // =====================================================================
@@ -2000,7 +2193,7 @@ class UIViewController {
     }
   }
 
-  handleRemoteMessage(data, code) {
+  async handleRemoteMessage(data, code) {
     if (!data || !data.type) return;
 
     if (data.type === 'PHONE_HELLO' || data.type === 'MIC_PING') {
@@ -2383,60 +2576,18 @@ class UIViewController {
       oldHeaderImport.remove();
     }
 
-    // 2. On-screen Karaoke Mic Card in player hero column
-    if (!document.getElementById('karaoke-mic-onscreen-card')) {
-      const heroCol = document.querySelector('.player-hero-column');
-      if (heroCol) {
-        const card = document.createElement('div');
-        card.id = 'karaoke-mic-onscreen-card';
-        card.className = 'karaoke-mic-onscreen-card focusable';
-        card.tabIndex = 0;
-        card.title = 'Wireless Mic Options';
-        card.setAttribute('data-focus-name', 'Wireless Mic Options');
-        card.innerHTML = `
-          <div class="karaoke-mic-card-header">
-            <span class="karaoke-mic-badge-icon">🎙️</span>
-            <div class="karaoke-mic-text-group">
-              <div class="karaoke-mic-headline">Wireless Karaoke Mic</div>
-              <div class="karaoke-mic-tagline">Scan with phone to sing live</div>
-            </div>
-          </div>
-          <div id="karaoke-onscreen-qr" class="karaoke-onscreen-qr"></div>
-          <div class="karaoke-mic-card-footer">
-            <div id="karaoke-onscreen-status-pill" class="karaoke-mic-status-pill disconnected">
-              <span class="status-indicator-dot"></span>
-              <span id="karaoke-onscreen-status-text">Waiting for phone...</span>
-            </div>
-            <div class="karaoke-cason-hint">💡 Cason Bluetooth Mic: Pair in TV Sound Settings</div>
-          </div>
-        `;
-        card.addEventListener('click', () => this.openMicModal());
-        const artFrame = heroCol.querySelector('.player-art-frame');
-        if (artFrame && artFrame.nextSibling) {
-          heroCol.insertBefore(card, artFrame.nextSibling);
-        } else {
-          heroCol.appendChild(card);
-        }
-      }
-    }
+    // 2. Remove On-screen Karaoke Mic Card & Lyrics Sync HUD to keep player clean
+    const oldMicCard = document.getElementById('karaoke-mic-onscreen-card');
+    if (oldMicCard) oldMicCard.remove();
 
-    // 3. Lyrics Sync Calibration HUD in player side column
-    if (!document.getElementById('lyrics-sync-hud')) {
-      const sideCol = document.querySelector('.player-side-column');
-      if (sideCol) {
-        const hud = document.createElement('div');
-        hud.id = 'lyrics-sync-hud';
-        hud.className = 'lyrics-sync-hud';
-        hud.innerHTML = `
-          <button id="btn-sync-earlier" class="sync-nudge-btn focusable" tabindex="0" title="Lyrics Earlier (-0.5s)" data-focus-name="Lyrics Earlier">⏪ -0.5s</button>
-          <span id="sync-offset-display" class="sync-offset-pill">Sync: 0.0s</span>
-          <button id="btn-sync-later" class="sync-nudge-btn focusable" tabindex="0" title="Lyrics Later (+0.5s)" data-focus-name="Lyrics Later">+0.5s ⏩</button>
-          <button id="btn-sync-reset" class="sync-reset-btn focusable" tabindex="0" title="Reset (0.0s)" data-focus-name="Reset Sync">Reset</button>
-        `;
-        sideCol.insertBefore(hud, sideCol.firstChild);
-        this.setupLyricsSyncControls();
-      }
-    }
+    const oldSyncHud = document.getElementById('lyrics-sync-hud');
+    if (oldSyncHud) oldSyncHud.remove();
+
+    // 3. Remove cluttered buttons from fullscreen player interface
+    ['btn-player-settings', 'btn-toggle-dual-lyrics', 'btn-toggle-visualizer', 'btn-party-jukebox'].forEach(id => {
+      const btn = document.getElementById(id);
+      if (btn) btn.remove();
+    });
 
     // 4. Ensure Import Modal exists in DOM
     if (!document.getElementById('import-modal')) {
