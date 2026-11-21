@@ -6,8 +6,8 @@
  */
 class AppUpdater {
   constructor() {
-    this.currentVersion = '1.3.7';
-    this.currentBuild = 147;
+    this.currentVersion = '1.3.8';
+    this.currentBuild = 150;
     this.defaultUpdateUrl = 'https://raw.githubusercontent.com/ayush019z/laya-tizen/main/version.json';
     this.updateUrl = localStorage.getItem('layatv_ota_url') || this.defaultUpdateUrl;
     this.isAutoUpdateEnabled = localStorage.getItem('layatv_ota_autocheck') !== 'false';
@@ -41,13 +41,16 @@ class AppUpdater {
       const remote = await response.json();
       this.remoteData = remote;
 
-      const hasUpdate = this.compareVersions(remote.version, this.activeVersion) > 0;
+      const remoteBuild = remote.build || 0;
+      const activeBuild = parseInt(localStorage.getItem('layatv_active_build') || this.currentBuild || '0', 10);
+      const verComp = this.compareVersions(remote.version, this.activeVersion);
+      const hasUpdate = verComp > 0 || (verComp === 0 && remoteBuild > activeBuild);
 
       if (hasUpdate) {
         this.status = 'available';
         this.notifyUI();
         if (window.UIController) {
-          window.UIController.showToast(`New update v${remote.version} available!`);
+          window.UIController.showToast(`New update v${remote.version} (build ${remoteBuild}) available!`);
         }
         // Auto-download update if enabled
         if (this.isAutoUpdateEnabled) {
@@ -96,8 +99,9 @@ class AppUpdater {
         localStorage.setItem(`layatv_ota_file_${file}`, content);
       }
 
-      // Record active version
+      // Record active version and build
       localStorage.setItem('layatv_active_version', remote.version);
+      localStorage.setItem('layatv_active_build', String(remote.build || 0));
       this.activeVersion = remote.version;
       this.status = 'ready';
       this.notifyUI();

@@ -1,11 +1,11 @@
 {
-  "version": "1.3.7",
-  "build": 147,
+  "version": "1.3.8",
+  "build": 150,
   "releaseDate": "2026-11-21",
   "minTizenVersion": "3.0",
   "updateUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/version.json",
   "bundleBaseUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/",
-  "changelog": "Fix lyrics synchronization: parse LRC [offset] tag, duration-matched LRCLIB lookup, 180ms audio output lead compensation, and live on-screen +/-0.5s lyrics sync calibration HUD.",
+  "changelog": "Accurate duration-matched lyrics sync, LRC offset support, live on-screen lyrics calibration HUD, on-screen Karaoke QR Code card, and Import Playlist header and library buttons.",
   "files": [
     "index.html",
     "mic.html",
