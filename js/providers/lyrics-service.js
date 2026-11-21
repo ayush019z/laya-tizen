@@ -27,7 +27,7 @@ class LyricsService {
       return parsed;
     }
 
-    // 2. Query LRCLIB via precise get
+    // 2. Query LRCLIB via precise get with track duration matching
     const cleanTitle = (track.title || '')
       .replace(/\(From.*?\)/gi, '')
       .replace(/\[From.*?\]/gi, '')
@@ -35,9 +35,11 @@ class LyricsService {
       .replace(/ - Soundtrack.*/gi, '')
       .trim();
     const firstArtist = (track.artist || '').split(/[,-]/)[0].trim();
+    const targetDuration = track.duration && track.duration > 20 ? Math.round(track.duration) : 0;
+    const durParam = targetDuration > 0 ? `&duration=${targetDuration}` : '';
 
     try {
-      const url = `${this.apiBase}/get?track_name=${encodeURIComponent(cleanTitle)}&artist_name=${encodeURIComponent(firstArtist)}`;
+      const url = `${this.apiBase}/get?track_name=${encodeURIComponent(cleanTitle)}&artist_name=${encodeURIComponent(firstArtist)}${durParam}`;
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
@@ -53,23 +55,34 @@ class LyricsService {
       }
     } catch (e) {}
 
+    // Helper to pick candidate with closest audio duration match (prevents music video / remix offset)
+    const findClosestDurationMatch = (list) => {
+      if (!Array.isArray(list) || list.length === 0) return null;
+      const synced = list.filter(x => x.syncedLyrics);
+      const candidates = synced.length > 0 ? synced : list;
+      if (!targetDuration) return candidates[0];
+      return candidates.slice().sort((a, b) => {
+        const diffA = Math.abs((a.duration || 0) - targetDuration);
+        const diffB = Math.abs((b.duration || 0) - targetDuration);
+        return diffA - diffB;
+      })[0];
+    };
+
     // 3. Query LRCLIB Search endpoint (handles variations like "Ishq Hai", "Kesariya", etc.)
     try {
       const searchUrl = `${this.apiBase}/search?q=${encodeURIComponent(cleanTitle + ' ' + firstArtist)}`;
       const sRes = await fetch(searchUrl);
       if (sRes.ok) {
         const sData = await sRes.json();
-        if (Array.isArray(sData) && sData.length > 0) {
-          const match = sData.find(x => x.syncedLyrics) || sData[0];
-          if (match?.syncedLyrics) {
-            const parsed = this.parseLRC(match.syncedLyrics);
-            this.cache.set(cacheKey, parsed);
-            return parsed;
-          } else if (match?.plainLyrics) {
-            const parsed = this.parsePlainLyrics(match.plainLyrics, track.duration || 240);
-            this.cache.set(cacheKey, parsed);
-            return parsed;
-          }
+        const match = findClosestDurationMatch(sData);
+        if (match?.syncedLyrics) {
+          const parsed = this.parseLRC(match.syncedLyrics);
+          this.cache.set(cacheKey, parsed);
+          return parsed;
+        } else if (match?.plainLyrics) {
+          const parsed = this.parsePlainLyrics(match.plainLyrics, track.duration || 240);
+          this.cache.set(cacheKey, parsed);
+          return parsed;
         }
       }
     } catch (e) {}
@@ -80,17 +93,15 @@ class LyricsService {
       const tRes = await fetch(titleOnlyUrl);
       if (tRes.ok) {
         const tData = await tRes.json();
-        if (Array.isArray(tData) && tData.length > 0) {
-          const match = tData.find(x => x.syncedLyrics) || tData[0];
-          if (match?.syncedLyrics) {
-            const parsed = this.parseLRC(match.syncedLyrics);
-            this.cache.set(cacheKey, parsed);
-            return parsed;
-          } else if (match?.plainLyrics) {
-            const parsed = this.parsePlainLyrics(match.plainLyrics, track.duration || 240);
-            this.cache.set(cacheKey, parsed);
-            return parsed;
-          }
+        const match = findClosestDurationMatch(tData);
+        if (match?.syncedLyrics) {
+          const parsed = this.parseLRC(match.syncedLyrics);
+          this.cache.set(cacheKey, parsed);
+          return parsed;
+        } else if (match?.plainLyrics) {
+          const parsed = this.parsePlainLyrics(match.plainLyrics, track.duration || 240);
+          this.cache.set(cacheKey, parsed);
+          return parsed;
         }
       }
     } catch (e) {}
@@ -142,6 +153,13 @@ class LyricsService {
     const lines = lrcText.split('\n');
     const result = [];
 
+    // Parse [offset: +/-millis]
+    let lrcOffset = 0;
+    const offsetMatch = lrcText.match(/\[offset:\s*([+-]?\d+)\]/i);
+    if (offsetMatch) {
+      lrcOffset = parseInt(offsetMatch[1], 10) / 1000;
+    }
+
     const timeRegex = /\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)/;
     const wordRegex = /<(\d{2}):(\d{2})\.(\d{2,3})>([^<]*)/g;
 
@@ -152,7 +170,7 @@ class LyricsService {
       const min = parseInt(match[1], 10);
       const sec = parseInt(match[2], 10);
       const ms = parseInt(match[3].padEnd(3, '0'), 10);
-      const startTime = min * 60 + sec + ms / 1000;
+      const startTime = Math.max(0, (min * 60 + sec + ms / 1000) + lrcOffset);
       const text = match[4].trim();
 
       // Check for word-level timestamps
@@ -165,7 +183,7 @@ class LyricsService {
         const wMin = parseInt(wordMatch[1], 10);
         const wSec = parseInt(wordMatch[2], 10);
         const wMs = parseInt(wordMatch[3].padEnd(3, '0'), 10);
-        const wTime = wMin * 60 + wSec + wMs / 1000;
+        const wTime = Math.max(0, (wMin * 60 + wSec + wMs / 1000) + lrcOffset);
         const wordText = wordMatch[4].trim();
         if (wordText) {
           words.push({ text: wordText, time: wTime });
@@ -178,7 +196,7 @@ class LyricsService {
         plainWords.forEach((pw, idx) => {
           words.push({
             text: pw,
-            time: startTime + idx * 0.35 // synthetic word cadence
+            time: Math.max(0, startTime + idx * 0.35)
           });
         });
       }

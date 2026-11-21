@@ -36,6 +36,7 @@ class UIViewController {
     this.setupDualScriptToggle();
     this.setupPlaylistImporter();
     this.setupWirelessMic();
+    this.setupLyricsSyncControls();
     this.renderHome();
     this.renderVirtualKeyboard();
   }
@@ -1063,6 +1064,7 @@ class UIViewController {
   }
 
   renderLyrics(lyrics) {
+    this.updateSyncDisplay();
     const container = document.getElementById('lyrics-container');
     if (!container) return;
 
@@ -1148,10 +1150,15 @@ class UIViewController {
   updateWordLyrics(lyrics, currentTime) {
     if (!lyrics || lyrics.length === 0) return;
 
+    // Apply track-specific calibration offset + 180ms audio hardware lead-time
+    const currentTrack = window.AudioPlayer ? window.AudioPlayer.currentTrack : null;
+    const userOffset = this.getTrackLyricsOffset(currentTrack);
+    const calibratedTime = Math.max(0, currentTime + userOffset + 0.18);
+
     // Fast-find active line index
     let activeLineIdx = -1;
     for (let i = 0; i < lyrics.length; i++) {
-      if (currentTime >= lyrics[i].time) {
+      if (calibratedTime >= lyrics[i].time) {
         activeLineIdx = i;
       } else {
         break;
@@ -1214,7 +1221,7 @@ class UIViewController {
           let activeWordEl = null;
           words.forEach(w => {
             const wTime = parseFloat(w.getAttribute('data-word-time') || 0);
-            if (currentTime >= wTime) {
+            if (calibratedTime >= wTime) {
               w.classList.add('sung');
               activeWordEl = w;
             } else {
@@ -1228,10 +1235,78 @@ class UIViewController {
           const currTime = lyrics[activeLineIdx].time;
           const nextTime = lyrics[activeLineIdx + 1] ? lyrics[activeLineIdx + 1].time : currTime + 4.0;
           const duration = Math.max(0.8, nextTime - currTime);
-          const progress = Math.min(1, Math.max(0, (currentTime - currTime) / duration));
+          const progress = Math.min(1, Math.max(0, (calibratedTime - currTime) / duration));
           ball.style.left = Math.round(progress * Math.min(currLine.offsetWidth, 480)) + 'px';
         }
       }
+    }
+  }
+
+  getTrackLyricsOffset(track) {
+    if (!track) return 0;
+    const key = `layatv_lyric_offset_${track.title}_${track.artist}`;
+    try {
+      const saved = localStorage.getItem(key);
+      return saved !== null ? parseFloat(saved) : 0;
+    } catch(e) {
+      return 0;
+    }
+  }
+
+  setTrackLyricsOffset(track, offset) {
+    if (!track) return;
+    const key = `layatv_lyric_offset_${track.title}_${track.artist}`;
+    const rounded = Math.round(offset * 10) / 10;
+    try {
+      localStorage.setItem(key, rounded);
+    } catch(e) {}
+    this.updateSyncDisplay(rounded);
+  }
+
+  updateSyncDisplay(offsetVal = null) {
+    const track = window.AudioPlayer ? window.AudioPlayer.currentTrack : null;
+    const offset = offsetVal !== null ? offsetVal : this.getTrackLyricsOffset(track);
+    const disp = document.getElementById('sync-offset-display');
+    if (disp) {
+      const sign = offset > 0 ? '+' : '';
+      disp.textContent = `Sync: ${sign}${offset.toFixed(1)}s`;
+      disp.style.color = offset === 0 ? '#4ade80' : '#ffaa00';
+    }
+  }
+
+  setupLyricsSyncControls() {
+    const btnEarlier = document.getElementById('btn-sync-earlier');
+    if (btnEarlier) {
+      btnEarlier.addEventListener('click', () => {
+        const track = window.AudioPlayer ? window.AudioPlayer.currentTrack : null;
+        if (!track) return;
+        const current = this.getTrackLyricsOffset(track);
+        const next = Math.round((current - 0.5) * 10) / 10;
+        this.setTrackLyricsOffset(track, next);
+        this.showToast(`⏱️ Lyrics Earlier: ${next > 0 ? '+' : ''}${next.toFixed(1)}s (Saved)`);
+      });
+    }
+
+    const btnLater = document.getElementById('btn-sync-later');
+    if (btnLater) {
+      btnLater.addEventListener('click', () => {
+        const track = window.AudioPlayer ? window.AudioPlayer.currentTrack : null;
+        if (!track) return;
+        const current = this.getTrackLyricsOffset(track);
+        const next = Math.round((current + 0.5) * 10) / 10;
+        this.setTrackLyricsOffset(track, next);
+        this.showToast(`⏱️ Lyrics Later: ${next > 0 ? '+' : ''}${next.toFixed(1)}s (Saved)`);
+      });
+    }
+
+    const btnReset = document.getElementById('btn-sync-reset');
+    if (btnReset) {
+      btnReset.addEventListener('click', () => {
+        const track = window.AudioPlayer ? window.AudioPlayer.currentTrack : null;
+        if (!track) return;
+        this.setTrackLyricsOffset(track, 0.0);
+        this.showToast('⏱️ Lyrics Sync Reset to 0.0s');
+      });
     }
   }
 
@@ -1920,7 +1995,25 @@ class UIViewController {
       }
     }
 
-    // 3. Fallback bootloader for PlaylistImporter
+    // 3. Lyrics Sync Calibration HUD in player side column
+    if (!document.getElementById('lyrics-sync-hud')) {
+      const sideCol = document.querySelector('.player-side-column');
+      if (sideCol) {
+        const hud = document.createElement('div');
+        hud.id = 'lyrics-sync-hud';
+        hud.className = 'lyrics-sync-hud';
+        hud.innerHTML = `
+          <button id="btn-sync-earlier" class="sync-nudge-btn focusable" tabindex="0" title="Lyrics Earlier (-0.5s)" data-focus-name="Lyrics Earlier">⏪ -0.5s</button>
+          <span id="sync-offset-display" class="sync-offset-pill">Sync: 0.0s</span>
+          <button id="btn-sync-later" class="sync-nudge-btn focusable" tabindex="0" title="Lyrics Later (+0.5s)" data-focus-name="Lyrics Later">+0.5s ⏩</button>
+          <button id="btn-sync-reset" class="sync-reset-btn focusable" tabindex="0" title="Reset (0.0s)" data-focus-name="Reset Sync">Reset</button>
+        `;
+        sideCol.insertBefore(hud, sideCol.firstChild);
+        this.setupLyricsSyncControls();
+      }
+    }
+
+    // 4. Fallback bootloader for PlaylistImporter
     if (!window.PlaylistImporter) {
       try {
         const cached = localStorage.getItem('layatv_ota_file_js/providers/playlist-importer.js');

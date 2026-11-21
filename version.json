@@ -1,11 +1,11 @@
 {
   "version": "1.3.7",
-  "build": 146,
+  "build": 147,
   "releaseDate": "2026-11-21",
   "minTizenVersion": "3.0",
   "updateUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/version.json",
   "bundleBaseUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/",
-  "changelog": "Prominent top-bar and library Import Playlist options, on-screen Karaoke stage live QR Code HUD, and resilient dynamic DOM self-provisioning.",
+  "changelog": "Fix lyrics synchronization: parse LRC [offset] tag, duration-matched LRCLIB lookup, 180ms audio output lead compensation, and live on-screen +/-0.5s lyrics sync calibration HUD.",
   "files": [
     "index.html",
     "mic.html",

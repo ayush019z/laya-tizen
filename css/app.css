@@ -2324,3 +2324,53 @@ html, body {
   font-size: 13px;
   color: rgba(255, 255, 255, 0.65);
 }
+
+/* =====================================================================
+   LYRICS SYNC CALIBRATION HUD
+   ===================================================================== */
+.lyrics-sync-hud {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  position: absolute;
+  top: 16px;
+  right: 40px;
+  z-index: 35;
+  background: rgba(18, 18, 28, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 6px 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+.sync-nudge-btn, .sync-reset-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid transparent;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 6px 14px;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.sync-nudge-btn:focus, .sync-reset-btn:focus {
+  background: var(--dynamic-accent);
+  border-color: #ffffff;
+  transform: scale(1.08);
+  box-shadow: 0 0 16px var(--dynamic-glow);
+}
+
+.sync-offset-pill {
+  font-size: 13px;
+  font-weight: 800;
+  color: #4ade80;
+  padding: 0 6px;
+  font-family: monospace;
+}
+}

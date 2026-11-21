@@ -77,6 +77,9 @@ class SpatialNavigator {
                 element.getAttribute('title');
 
     const nameMap = {
+      'btn-sync-earlier': 'Lyrics Earlier (-0.5s)',
+      'btn-sync-later': 'Lyrics Later (+0.5s)',
+      'btn-sync-reset': 'Reset Sync (0.0s)',
       'btn-header-import': 'Import Playlist',
       'banner-import-playlist': 'Import Playlist',
       'karaoke-mic-onscreen-card': 'Wireless Mic Options',
