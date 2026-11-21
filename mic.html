@@ -10,10 +10,11 @@
   <style>
     :root {
       --bg: #09090f;
-      --card: rgba(22, 22, 32, 0.85);
+      --card: rgba(22, 22, 32, 0.88);
       --accent: #ff2a6d;
       --glow: rgba(255, 42, 109, 0.45);
       --green: #4ade80;
+      --yellow: #facc15;
     }
     * {
       box-sizing: border-box;
@@ -30,39 +31,67 @@
       flex-direction: column;
       align-items: center;
       justify-content: space-between;
-      padding: 24px 20px;
+      padding: 20px 18px 24px;
       overflow-x: hidden;
     }
     .header {
       width: 100%;
+      max-width: 440px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding-bottom: 20px;
+      padding-bottom: 16px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     }
     .brand {
       display: flex;
       align-items: center;
       gap: 10px;
-      font-size: 20px;
+      font-size: 19px;
       font-weight: 800;
+    }
+    .room-badge {
+      font-size: 12px;
+      font-weight: 800;
+      padding: 5px 12px;
+      background: rgba(255, 42, 109, 0.18);
+      border: 1px solid var(--accent);
+      border-radius: 12px;
+      color: var(--accent);
+      cursor: pointer;
     }
     .status-pill {
       font-size: 12px;
       font-weight: 700;
-      padding: 4px 12px;
+      padding: 5px 12px;
       border-radius: 14px;
       background: rgba(255, 255, 255, 0.08);
       border: 1px solid rgba(255, 255, 255, 0.15);
       display: flex;
       align-items: center;
       gap: 6px;
+      transition: all 0.3s ease;
     }
-    .status-pill.live {
+    .status-pill.connecting {
+      background: rgba(250, 204, 21, 0.18);
+      border-color: var(--yellow);
+      color: var(--yellow);
+    }
+    .status-pill.connected {
       background: rgba(74, 222, 128, 0.18);
       border-color: var(--green);
       color: var(--green);
+    }
+    .status-pill.live {
+      background: rgba(255, 42, 109, 0.25);
+      border-color: var(--accent);
+      color: #ffffff;
+      box-shadow: 0 0 15px rgba(255, 42, 109, 0.4);
+    }
+    .status-pill.error {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: #ef4444;
+      color: #ef4444;
     }
     .dot {
       width: 8px;
@@ -70,20 +99,33 @@
       border-radius: 50%;
       background: #888;
     }
-    .status-pill.live .dot {
+    .status-pill.connecting .dot {
+      background: var(--yellow);
+      animation: pulse 1s infinite alternate;
+    }
+    .status-pill.connected .dot {
       background: var(--green);
-      box-shadow: 0 0 10px var(--green);
+      box-shadow: 0 0 8px var(--green);
+    }
+    .status-pill.live .dot {
+      background: #ff2a6d;
+      box-shadow: 0 0 12px #ff2a6d;
+      animation: pulse 0.8s infinite alternate;
+    }
+    @keyframes pulse {
+      0% { opacity: 0.4; transform: scale(0.9); }
+      100% { opacity: 1; transform: scale(1.15); }
     }
     .mic-center {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 24px;
-      margin: 30px 0;
+      gap: 20px;
+      margin: 20px 0;
     }
     .mic-btn {
-      width: 180px;
-      height: 180px;
+      width: 175px;
+      height: 175px;
       border-radius: 50%;
       background: linear-gradient(135deg, #1f1f2e 0%, #12121a 100%);
       border: 3px solid rgba(255, 255, 255, 0.18);
@@ -94,25 +136,31 @@
       cursor: pointer;
       box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
       transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      user-select: none;
+    }
+    .mic-btn.disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      border-color: rgba(255, 255, 255, 0.1);
     }
     .mic-btn.active {
       border-color: var(--accent);
-      background: radial-gradient(circle, rgba(255, 42, 109, 0.35) 0%, #151520 70%);
-      box-shadow: 0 0 60px var(--glow), 0 0 100px rgba(255, 42, 109, 0.2);
+      background: radial-gradient(circle, rgba(255, 42, 109, 0.4) 0%, #151520 70%);
+      box-shadow: 0 0 50px var(--glow), 0 0 80px rgba(255, 42, 109, 0.25);
       transform: scale(1.05);
     }
     .mic-icon-svg {
-      width: 64px;
-      height: 64px;
+      width: 60px;
+      height: 60px;
       fill: #ffffff;
       transition: transform 0.2s ease;
     }
     .mic-btn.active .mic-icon-svg {
       fill: var(--accent);
-      transform: scale(1.1);
+      transform: scale(1.12);
     }
     .mic-label {
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 800;
       letter-spacing: 0.6px;
       text-transform: uppercase;
@@ -135,11 +183,11 @@
     }
     .controls-card {
       width: 100%;
-      max-width: 360px;
+      max-width: 380px;
       background: var(--card);
       border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 24px;
-      padding: 20px;
+      border-radius: 22px;
+      padding: 18px 20px;
       display: flex;
       flex-direction: column;
       gap: 16px;
@@ -154,7 +202,7 @@
       justify-content: space-between;
       font-size: 13px;
       font-weight: 700;
-      color: rgba(255, 255, 255, 0.7);
+      color: rgba(255, 255, 255, 0.8);
     }
     input[type=range] {
       width: 100%;
@@ -173,9 +221,29 @@
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
       cursor: pointer;
     }
+    .footer-box {
+      width: 100%;
+      max-width: 380px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .cason-tip-card {
+      background: rgba(255, 42, 109, 0.1);
+      border: 1px solid rgba(255, 42, 109, 0.28);
+      border-radius: 16px;
+      padding: 12px 14px;
+      font-size: 12px;
+      line-height: 1.45;
+      color: rgba(255, 255, 255, 0.85);
+    }
+    .cason-tip-card strong {
+      color: #ff2a6d;
+    }
     .footer-hint {
       font-size: 12px;
-      color: rgba(255, 255, 255, 0.4);
+      color: rgba(255, 255, 255, 0.45);
       text-align: center;
       line-height: 1.4;
     }
@@ -185,23 +253,23 @@
   <div class="header">
     <div class="brand">
       <svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:#ff2a6d;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-      <span>Laya Karaoke Mic</span>
+      <span>Laya Mic</span>
     </div>
     <div style="display: flex; gap: 8px; align-items: center;">
-      <div id="room-code-tag" style="font-size: 11px; font-weight: 800; padding: 4px 10px; background: rgba(255, 42, 109, 0.2); border: 1px solid #ff2a6d; border-radius: 12px; color: #ff2a6d;">ROOM: --</div>
-      <div id="status-pill" class="status-pill">
+      <div id="room-code-tag" class="room-badge" title="Tap to change room code">ROOM: --</div>
+      <div id="status-pill" class="status-pill connecting">
         <div class="dot"></div>
-        <span id="status-text">Ready</span>
+        <span id="status-text">Connecting...</span>
       </div>
     </div>
   </div>
 
   <div class="mic-center">
-    <div id="mic-btn" class="mic-btn">
+    <div id="mic-btn" class="mic-btn disabled">
       <svg class="mic-icon-svg" viewBox="0 0 24 24">
         <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5zm6 6c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
       </svg>
-      <span id="mic-label" class="mic-label">Tap to Sing</span>
+      <span id="mic-label" class="mic-label">Waiting for TV...</span>
     </div>
     <div class="vu-bar-container">
       <div id="vu-bar-fill" class="vu-bar-fill"></div>
@@ -226,22 +294,42 @@
     </div>
   </div>
 
-  <div class="footer-hint">
-    Hold phone close to your mouth like a stage microphone.<br/>
-    Audio feeds live into your Samsung TV speakers!
+  <div class="footer-box">
+    <div class="cason-tip-card">
+      <strong>🎤 Using a Cason / Bluetooth Mic?</strong><br/>
+      For zero audio lag, pair your mic directly with TV: <em>TV Settings ➔ Sound ➔ Sound Output ➔ Bluetooth Speaker List</em>.
+    </div>
+    <div id="footer-hint" class="footer-hint">
+      Searching for your Samsung TV...
+    </div>
   </div>
 
   <script>
     const urlParams = new URLSearchParams(window.location.search);
-    const roomCode = urlParams.get('room') || 'STAGE-1';
-    const roomTag = document.getElementById('room-code-tag');
-    if (roomTag) roomTag.textContent = roomCode;
+    let roomCode = (urlParams.get('room') || '').replace(/^LAYA-/i, '').trim();
+    if (!roomCode) {
+      roomCode = prompt('Enter 4-digit TV Code shown on your screen:', '8842') || '8842';
+      roomCode = roomCode.replace(/^LAYA-/i, '').trim();
+    }
 
+    const roomTag = document.getElementById('room-code-tag');
+    if (roomTag) {
+      roomTag.textContent = 'CODE: ' + roomCode;
+      roomTag.addEventListener('click', () => {
+        const newCode = prompt('Enter TV Code from your screen:', roomCode);
+        if (newCode) {
+          window.location.href = window.location.pathname + '?room=' + encodeURIComponent(newCode.trim());
+        }
+      });
+    }
+
+    let isConnectedToTV = false;
     let isLive = false;
     let audioCtx = null;
     let micStream = null;
     let analyser = null;
     let animId = null;
+    let lastPollTime = Math.floor(Date.now() / 1000) - 2;
 
     const micBtn = document.getElementById('mic-btn');
     const micLabel = document.getElementById('mic-label');
@@ -252,18 +340,93 @@
     const volNum = document.getElementById('mic-vol-num');
     const echoSlider = document.getElementById('mic-echo-slider');
     const echoNum = document.getElementById('mic-echo-num');
+    const footerHint = document.getElementById('footer-hint');
 
+    // 1. Sliders broadcast live settings
     volSlider.addEventListener('input', (e) => {
       volNum.textContent = e.target.value + '%';
-      broadcastMicSettings();
+      sendMicState(isLive);
     });
 
     echoSlider.addEventListener('input', (e) => {
       echoNum.textContent = e.target.value + '%';
-      broadcastMicSettings();
+      sendMicState(isLive);
     });
 
+    // 2. Real Two-Way Handshake with TV
+    async function sendToTV(payload) {
+      try {
+        await fetch(`https://ntfy.sh/layatv_tv_${roomCode}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } catch (err) {
+        console.warn('Network send error:', err);
+      }
+    }
+
+    async function pollTVResponse() {
+      try {
+        const resp = await fetch(`https://ntfy.sh/layatv_phone_${roomCode}/json?poll=1&since=${lastPollTime}`);
+        if (!resp.ok) return;
+        const text = await resp.text();
+        if (!text || !text.trim()) return;
+
+        const lines = text.trim().split('\n');
+        for (const line of lines) {
+          try {
+            const entry = JSON.parse(line);
+            if (entry.event === 'message' && entry.message) {
+              if (entry.time) lastPollTime = Math.max(lastPollTime, entry.time);
+              const data = JSON.parse(entry.message);
+              if (data.type === 'TV_ACK' && (data.room == roomCode || !data.room)) {
+                onTVConnected();
+              }
+            }
+          } catch (e) {}
+        }
+      } catch (e) {}
+    }
+
+    function onTVConnected() {
+      if (!isConnectedToTV) {
+        isConnectedToTV = true;
+        micBtn.classList.remove('disabled');
+        if (!isLive) {
+          statusPill.className = 'status-pill connected';
+          statusText.textContent = 'TV Connected';
+          micLabel.textContent = 'Tap to Sing';
+          footerHint.textContent = '🎉 Connected to Samsung TV! Tap the mic button to start singing.';
+        }
+      }
+    }
+
+    // Ping TV every 2 seconds
+    let handshakeAttempts = 0;
+    const handshakeTimer = setInterval(() => {
+      sendToTV({ type: 'PHONE_HELLO', room: roomCode, time: Date.now() });
+      pollTVResponse();
+      handshakeAttempts++;
+
+      if (!isConnectedToTV && handshakeAttempts >= 5) {
+        statusPill.className = 'status-pill error';
+        statusText.textContent = 'TV Offline';
+        micLabel.textContent = 'Code Not Found';
+        footerHint.textContent = `⚠️ Cannot find TV with code "${roomCode}". Make sure the TV is turned on and code matches TV screen!`;
+      }
+    }, 2000);
+
+    // Initial ping
+    sendToTV({ type: 'PHONE_HELLO', room: roomCode, time: Date.now() });
+    pollTVResponse();
+
+    // 3. Microphone Capture & Live State
     micBtn.addEventListener('click', async () => {
+      if (!isConnectedToTV) {
+        alert(`Cannot connect to TV with code "${roomCode}". Please check the code on your TV screen!`);
+        return;
+      }
       if (!isLive) {
         await startMic();
       } else {
@@ -290,32 +453,30 @@
         isLive = true;
         micBtn.classList.add('active');
         micLabel.textContent = 'Singing Live!';
-        statusPill.classList.add('live');
+        statusPill.className = 'status-pill live';
         statusText.textContent = 'LIVE ON TV';
+        footerHint.textContent = '🎙️ Live! Sing into your phone close to your mouth.';
 
-        // Notify TV
-        broadcastLiveMic(true);
+        sendMicState(true);
         runVUMeter();
       } catch (err) {
-        alert('Microphone permission required to sing: ' + err.message);
+        alert('Microphone permission required: ' + err.message);
       }
     }
 
     function stopMic() {
-      if (micStream) {
-        micStream.getTracks().forEach(t => t.stop());
-      }
-      if (audioCtx) {
-        audioCtx.close();
-      }
+      if (micStream) micStream.getTracks().forEach(t => t.stop());
+      if (audioCtx) audioCtx.close();
       cancelAnimationFrame(animId);
       vuFill.style.width = '0%';
+
       isLive = false;
       micBtn.classList.remove('active');
       micLabel.textContent = 'Tap to Sing';
-      statusPill.classList.remove('live');
-      statusText.textContent = 'Muted';
-      broadcastLiveMic(false);
+      statusPill.className = 'status-pill connected';
+      statusText.textContent = 'Muted (Ready)';
+      footerHint.textContent = 'Microphone muted. Tap button to unmute.';
+      sendMicState(false);
     }
 
     function runVUMeter() {
@@ -330,20 +491,15 @@
       animId = requestAnimationFrame(runVUMeter);
     }
 
-    function broadcastLiveMic(active) {
-      try {
-        localStorage.setItem('layatv_phone_mic_state', JSON.stringify({
-          active,
-          volume: volSlider.value / 100,
-          echo: echoSlider.value / 100,
-          timestamp: Date.now()
-        }));
-      } catch (e) {}
-    }
-
-    function broadcastMicSettings() {
-      if (!isLive) return;
-      broadcastLiveMic(true);
+    function sendMicState(active) {
+      sendToTV({
+        type: 'MIC_STATE',
+        active,
+        volume: volSlider.value / 100,
+        echo: echoSlider.value / 100,
+        room: roomCode,
+        time: Date.now()
+      });
     }
   </script>
 </body>

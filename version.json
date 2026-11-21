@@ -1,11 +1,11 @@
 {
-  "version": "1.3.8",
-  "build": 150,
+  "version": "1.3.9",
+  "build": 155,
   "releaseDate": "2026-11-21",
   "minTizenVersion": "3.0",
   "updateUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/version.json",
   "bundleBaseUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/",
-  "changelog": "Accurate duration-matched lyrics sync, LRC offset support, live on-screen lyrics calibration HUD, on-screen Karaoke QR Code card, and Import Playlist header and library buttons.",
+  "changelog": "Real-time Phone <-> TV remote bridge via ntfy.sh, handshake validation to prevent fake connections, Cason & Bluetooth mic pairing guide, complete modal overlay styles, and removed top header import button (library only).",
   "files": [
     "index.html",
     "mic.html",

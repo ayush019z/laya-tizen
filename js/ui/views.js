@@ -36,19 +36,13 @@ class UIViewController {
     this.setupDualScriptToggle();
     this.setupPlaylistImporter();
     this.setupWirelessMic();
+    this.setupRemoteBridge();
     this.setupLyricsSyncControls();
     this.renderHome();
     this.renderVirtualKeyboard();
   }
 
   setupTopBar() {
-    const importBtn = document.getElementById('btn-header-import');
-    if (importBtn) {
-      importBtn.addEventListener('click', () => {
-        this.openImportModal();
-      });
-    }
-
     const backBtn = document.getElementById('btn-header-back');
     if (backBtn) {
       backBtn.addEventListener('click', () => {
@@ -1659,12 +1653,25 @@ class UIViewController {
     }
   }
 
-  getPublicMobileUrl(page) {
-    const origin = window.location.origin;
-    if (origin && origin.startsWith('http')) {
-      return `${origin}/${page}?room=${this.roomCode}`;
+  getTVRoomCode() {
+    if (!this.roomCode) {
+      let saved = localStorage.getItem('layatv_stable_room_code');
+      if (!saved) {
+        saved = '' + Math.floor(1000 + Math.random() * 9000);
+        localStorage.setItem('layatv_stable_room_code', saved);
+      }
+      this.roomCode = saved;
     }
-    return `https://ayush019z.github.io/laya-tizen/${page}?room=${this.roomCode}`;
+    return this.roomCode;
+  }
+
+  getPublicMobileUrl(page) {
+    const code = this.getTVRoomCode();
+    const origin = window.location.origin;
+    if (origin && origin.startsWith('http') && !origin.includes('localhost') && !origin.includes('127.0.0.1')) {
+      return `${origin}/${page}?room=${code}`;
+    }
+    return `https://ayush019z.github.io/laya-tizen/${page}?room=${code}`;
   }
 
   renderKaraokeOnscreenQR() {
@@ -1725,28 +1732,114 @@ class UIViewController {
         }
       });
     }
+  }
 
-    // Monitor Phone Mic Link State
-    setInterval(() => {
+  // =====================================================================
+  // FEATURE 4: REAL-TIME PHONE <-> TV REMOTE BRIDGE (ntfy.sh)
+  // =====================================================================
+  setupRemoteBridge() {
+    const code = this.getTVRoomCode();
+    console.log('[RemoteBridge] Listening for phone commands on room code:', code);
+
+    let lastPollTime = Math.floor(Date.now() / 1000) - 2;
+
+    const pollBridge = async () => {
       try {
-        const stateRaw = localStorage.getItem('layatv_phone_mic_state');
-        if (stateRaw) {
-          const state = JSON.parse(stateRaw);
-          const statusPill = document.getElementById('mic-connection-status');
-          const statusText = document.getElementById('mic-status-text');
-          if (state && state.connected && Date.now() - (state.timestamp || 0) < 6000) {
-            if (statusPill && !statusPill.classList.contains('connected')) {
-              statusPill.className = 'mic-status-pill connected';
-              if (statusText) statusText.textContent = 'Phone Mic Connected (Live)';
-              this.showToast('🎙️ Phone Microphone Connected! Sing into your phone.');
+        const resp = await fetch(`https://ntfy.sh/layatv_tv_${code}/json?poll=1&since=${lastPollTime}`);
+        if (!resp.ok) return;
+        const text = await resp.text();
+        if (!text || !text.trim()) return;
+
+        const lines = text.trim().split('\n');
+        for (const line of lines) {
+          try {
+            const entry = JSON.parse(line);
+            if (entry.event === 'message' && entry.message) {
+              if (entry.time) lastPollTime = Math.max(lastPollTime, entry.time);
+              const data = JSON.parse(entry.message);
+              this.handleRemoteMessage(data, code);
             }
-          } else if (statusPill && statusPill.classList.contains('connected')) {
-            statusPill.className = 'mic-status-pill disconnected';
-            if (statusText) statusText.textContent = 'Waiting for phone...';
-          }
+          } catch (e) {}
         }
-      } catch (e) {}
-    }, 2000);
+      } catch (err) {}
+    };
+
+    setInterval(pollBridge, 1500);
+  }
+
+  handleRemoteMessage(data, code) {
+    if (!data || !data.type) return;
+
+    if (data.type === 'PHONE_HELLO' || data.type === 'MIC_PING') {
+      const statusPill = document.getElementById('mic-connection-status');
+      const statusText = document.getElementById('mic-status-text');
+      const onscreenPill = document.getElementById('karaoke-onscreen-status-pill');
+      const onscreenText = document.getElementById('karaoke-onscreen-status-text');
+
+      if (statusPill) {
+        statusPill.className = 'mic-status-pill connected';
+        if (statusText) statusText.textContent = 'Phone Mic Connected (Live)';
+      }
+      if (onscreenPill) {
+        onscreenPill.className = 'karaoke-mic-status-pill connected';
+        if (onscreenText) onscreenText.textContent = 'Phone Mic Connected (Live)';
+      }
+
+      this.showToast('🎙️ Phone Microphone Connected to TV!');
+
+      // Send ACK back to phone!
+      fetch(`https://ntfy.sh/layatv_phone_${code}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'TV_ACK',
+          room: code,
+          status: 'CONNECTED',
+          time: Date.now()
+        })
+      }).catch(() => {});
+    } else if (data.type === 'MIC_STATE') {
+      const statusPill = document.getElementById('mic-connection-status');
+      const statusText = document.getElementById('mic-status-text');
+      const onscreenPill = document.getElementById('karaoke-onscreen-status-pill');
+      const onscreenText = document.getElementById('karaoke-onscreen-status-text');
+
+      if (data.active) {
+        if (statusPill) {
+          statusPill.className = 'mic-status-pill connected';
+          if (statusText) statusText.textContent = '🔴 Phone Singing Live!';
+        }
+        if (onscreenPill) {
+          onscreenPill.className = 'karaoke-mic-status-pill connected';
+          if (onscreenText) onscreenText.textContent = '🔴 Phone Singing Live!';
+        }
+      } else {
+        if (statusPill) {
+          statusPill.className = 'mic-status-pill';
+          if (statusText) statusText.textContent = 'Phone Muted (Ready)';
+        }
+        if (onscreenPill) {
+          onscreenPill.className = 'karaoke-mic-status-pill';
+          if (onscreenText) onscreenText.textContent = 'Phone Muted (Ready)';
+        }
+      }
+
+      if (window.AudioDSP) {
+        if (data.volume !== undefined && window.AudioDSP.micGain) {
+          window.AudioDSP.micGain.gain.value = data.volume;
+        }
+        if (data.echo !== undefined) {
+          window.AudioDSP.setMicEcho(data.echo);
+        }
+      }
+    } else if (data.type === 'PLAYLIST_IMPORT') {
+      if (data.content) {
+        this.showToast('📲 Received playlist link from phone! Importing...');
+        const input = document.getElementById('import-url-input');
+        if (input) input.value = data.content;
+        this.executePlaylistImport();
+      }
+    }
   }
 
   openMicModal() {
@@ -1791,17 +1884,12 @@ class UIViewController {
   }
 
   // =====================================================================
-  // FEATURE 2: INSTANT PLAYLIST IMPORTER
+  // FEATURE 5: INSTANT PLAYLIST IMPORTER
   // =====================================================================
   setupPlaylistImporter() {
     const openBtn = document.getElementById('btn-open-importer');
     if (openBtn) {
       openBtn.addEventListener('click', () => this.openImportModal());
-    }
-
-    const headerImportBtn = document.getElementById('btn-header-import');
-    if (headerImportBtn) {
-      headerImportBtn.addEventListener('click', () => this.openImportModal());
     }
 
     const closeBtn = document.getElementById('btn-close-import');
@@ -1824,23 +1912,6 @@ class UIViewController {
         }
       });
     }
-
-    // Monitor Phone Remote Playlist Submissions via localStorage
-    setInterval(() => {
-      try {
-        const pendingRaw = localStorage.getItem('layatv_pending_import');
-        if (pendingRaw) {
-          localStorage.removeItem('layatv_pending_import');
-          const data = JSON.parse(pendingRaw);
-          if (data && data.content) {
-            this.showToast('📲 Received playlist link from phone! Importing...');
-            const input = document.getElementById('import-url-input');
-            if (input) input.value = data.content;
-            this.executePlaylistImport();
-          }
-        }
-      } catch (e) {}
-    }, 2000);
   }
 
   openImportModal() {
@@ -1941,21 +2012,10 @@ class UIViewController {
   }
 
   ensureDynamicDOM() {
-    // 1. Top bar Import button
-    if (!document.getElementById('btn-header-import')) {
-      const partyBtn = document.getElementById('btn-header-party');
-      if (partyBtn && partyBtn.parentNode) {
-        const btn = document.createElement('button');
-        btn.id = 'btn-header-import';
-        btn.className = 'party-pill-btn focusable';
-        btn.tabIndex = 0;
-        btn.title = 'Import Playlist';
-        btn.setAttribute('data-focus-name', 'Import Playlist');
-        btn.style.cssText = 'background: rgba(29, 185, 84, 0.2); border: 1.5px solid #1db954; color: #1ed760;';
-        btn.innerHTML = '<svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: currentColor;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg><span>Import Playlist</span>';
-        btn.addEventListener('click', () => this.openImportModal());
-        partyBtn.parentNode.insertBefore(btn, partyBtn);
-      }
+    // 1. Remove Top bar Import button if present (user explicitly requested it only in Library)
+    const oldHeaderImport = document.getElementById('btn-header-import');
+    if (oldHeaderImport) {
+      oldHeaderImport.remove();
     }
 
     // 2. On-screen Karaoke Mic Card in player hero column
@@ -2013,7 +2073,144 @@ class UIViewController {
       }
     }
 
-    // 4. Fallback bootloader for PlaylistImporter
+    // 4. Ensure Import Modal exists in DOM
+    if (!document.getElementById('import-modal')) {
+      const modal = document.createElement('div');
+      modal.id = 'import-modal';
+      modal.className = 'modal-overlay';
+      modal.style.display = 'none';
+      modal.innerHTML = `
+        <div class="party-modal-card" style="max-width: 820px;">
+          <div class="party-modal-header">
+            <div class="party-brand-lockup">
+              <div class="party-logo-badge" style="background: linear-gradient(135deg, #1db954, #1ed760);">📲</div>
+              <div>
+                <h2 class="party-title">Import External Playlists</h2>
+                <p class="party-subtitle">Spotify · JioSaavn · Apple Music · YouTube Music · Text List</p>
+              </div>
+            </div>
+            <button id="btn-close-import" class="party-close-btn focusable" tabindex="0" title="Close">✕</button>
+          </div>
+
+          <div class="party-modal-body" style="grid-template-columns: 260px 1fr; gap: 32px;">
+            <div class="party-qr-container">
+              <div id="import-qr-canvas" class="party-qr-box"></div>
+              <p class="party-qr-hint">Scan on phone to easily paste links from Spotify or Apple Music</p>
+            </div>
+
+            <div class="party-info-pane">
+              <p style="font-size: 15px; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.5;">
+                Paste a public playlist URL or track list. Songs will be resolved into full HD TV streams and saved to your TV Library:
+              </p>
+
+              <div style="display: flex; flex-direction: column; gap: 14px;">
+                <input type="text" id="import-url-input" class="tv-text-input focusable" tabindex="0" placeholder="Paste Spotify / JioSaavn / YouTube link or Artist - Song list..." spellcheck="false" autocomplete="off" />
+                
+                <div style="display: flex; gap: 12px;">
+                  <button id="btn-execute-import" class="pill-opt-btn focusable" tabindex="0" style="flex: 1; padding: 14px 20px; font-weight: 700; background: #1db954; color: #fff;">
+                    ⚡ Import Now
+                  </button>
+                  <button id="btn-import-sample" class="pill-opt-btn focusable" tabindex="0" style="padding: 14px 20px; font-weight: 600; background: rgba(255,255,255,0.08); color: #fff;">
+                    Try Demo Bollywood Mix
+                  </button>
+                </div>
+
+                <div id="import-progress-box" style="display: none; margin-top: 10px; padding: 14px; background: rgba(255,255,255,0.04); border-radius: 12px;">
+                  <div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 600; margin-bottom: 8px;">
+                    <span id="import-status-text">Fetching tracks...</span>
+                    <span id="import-progress-count">0%</span>
+                  </div>
+                  <div style="height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;">
+                    <div id="import-progress-bar" style="height: 100%; width: 0%; background: #1db954; transition: width 0.3s ease;"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      const closeBtn = modal.querySelector('#btn-close-import');
+      if (closeBtn) closeBtn.addEventListener('click', () => this.closeImportModal());
+      const execBtn = modal.querySelector('#btn-execute-import');
+      if (execBtn) execBtn.addEventListener('click', () => this.executePlaylistImport());
+      const sampleBtn = modal.querySelector('#btn-import-sample');
+      if (sampleBtn) sampleBtn.addEventListener('click', () => {
+        const inp = modal.querySelector('#import-url-input');
+        if (inp) {
+          inp.value = 'Arijit Singh - Kesariya\nDiljit Dosanjh - Lover\nBadshah - Jugnu\nShreya Ghoshal - Deewani Mastani\nAP Dhillon - With You';
+          this.executePlaylistImport();
+        }
+      });
+    }
+
+    // 5. Ensure Mic Modal exists in DOM
+    if (!document.getElementById('mic-modal')) {
+      const modal = document.createElement('div');
+      modal.id = 'mic-modal';
+      modal.className = 'modal-overlay';
+      modal.style.display = 'none';
+      modal.innerHTML = `
+        <div class="party-modal-card" style="max-width: 820px;">
+          <div class="party-modal-header">
+            <div class="party-brand-lockup">
+              <div class="party-logo-badge" style="background: linear-gradient(135deg, #ff007a, #7928ca);">🎙️</div>
+              <div>
+                <h2 class="party-title">Wireless Karaoke Microphone</h2>
+                <p class="party-subtitle">Turn your phone or Bluetooth mic into a live TV stage microphone</p>
+              </div>
+            </div>
+            <button id="btn-close-mic" class="party-close-btn focusable" tabindex="0" title="Close">✕</button>
+          </div>
+
+          <div class="party-modal-body" style="grid-template-columns: 260px 1fr; gap: 32px;">
+            <div class="party-qr-container">
+              <div id="mic-qr-canvas" class="party-qr-box"></div>
+              <p class="party-qr-hint">Scan with phone camera to sing live through TV speakers</p>
+              <div id="mic-connection-status" class="mic-status-pill disconnected">
+                <span class="status-indicator-dot"></span>
+                <span id="mic-status-text">Waiting for phone...</span>
+              </div>
+            </div>
+
+            <div class="party-info-pane">
+              <div class="party-perk-row">
+                <div class="perk-icon">📱</div>
+                <div class="perk-desc">
+                  <strong>Phone as Studio Mic:</strong> Real-time voice stream directly mixed into TV audio with ultra-low latency.
+                </div>
+              </div>
+              <div class="party-perk-row">
+                <div class="perk-icon">✨</div>
+                <div class="perk-desc">
+                  <strong>Studio Echo & Slapback:</strong> Built-in 160ms concert hall echo creates a live stage singing feel.
+                </div>
+              </div>
+              <div class="party-perk-row">
+                <div class="perk-icon">🎤</div>
+                <div class="perk-desc">
+                  <strong>Cason / Bluetooth Mics:</strong> Pair your Cason wireless mic via TV <em>Settings → Sound → Sound Output → Bluetooth Speaker List</em>, or use it standalone with TV backing tracks!
+                </div>
+              </div>
+
+              <div style="margin-top: 24px; display: flex; gap: 14px; align-items: center;">
+                <button id="btn-toggle-mic-test" class="pill-opt-btn focusable" tabindex="0" style="padding: 12px 24px; font-weight: 700; background: #252836; color: #fff;">
+                  🔊 Test TV Mic Input
+                </button>
+                <button id="btn-mic-echo-toggle" class="pill-opt-btn focusable" tabindex="0" style="padding: 12px 24px; font-weight: 700; background: rgba(255,255,255,0.08); color: #fff;">
+                  Echo: <span id="tv-mic-echo-status">ON (160ms)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      const closeBtn = modal.querySelector('#btn-close-mic');
+      if (closeBtn) closeBtn.addEventListener('click', () => this.closeMicModal());
+    }
+
+    // 6. Fallback bootloader for PlaylistImporter
     if (!window.PlaylistImporter) {
       try {
         const cached = localStorage.getItem('layatv_ota_file_js/providers/playlist-importer.js');
