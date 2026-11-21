@@ -41,6 +41,11 @@
       </div>
 
       <div style="display: flex; align-items: center; gap: 14px;">
+        <button id="btn-header-import" class="party-pill-btn focusable" tabindex="0" title="Import Playlist" data-focus-name="Import Playlist" style="background: rgba(29, 185, 84, 0.2); border: 1.5px solid #1db954; color: #1ed760;">
+          <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: currentColor;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+          <span>Import Playlist</span>
+        </button>
+
         <button id="btn-header-party" class="party-pill-btn focusable" tabindex="0" title="Party Jukebox">
           <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l6 4.5-6 4.5z"/></svg>
           <span>Party Jukebox</span>
@@ -276,6 +281,25 @@
           <div class="player-art-frame">
             <img src="https://c.saavncdn.com/430/Aashiqui-2-Hindi-2013-500x500.jpg" alt="Album Cover"/>
             <canvas id="player-visualizer-canvas" class="player-visualizer-canvas" width="410" height="410"></canvas>
+          </div>
+
+          <!-- On-Screen Karaoke Microphone & QR HUD Card -->
+          <div id="karaoke-mic-onscreen-card" class="karaoke-mic-onscreen-card focusable" tabindex="0" title="Wireless Mic Options" data-focus-name="Wireless Mic Options">
+            <div class="karaoke-mic-card-header">
+              <span class="karaoke-mic-badge-icon">🎙️</span>
+              <div class="karaoke-mic-text-group">
+                <div class="karaoke-mic-headline">Wireless Karaoke Mic</div>
+                <div class="karaoke-mic-tagline">Scan with phone to sing live</div>
+              </div>
+            </div>
+            <div id="karaoke-onscreen-qr" class="karaoke-onscreen-qr"></div>
+            <div class="karaoke-mic-card-footer">
+              <div id="karaoke-onscreen-status-pill" class="karaoke-mic-status-pill disconnected">
+                <span class="status-indicator-dot"></span>
+                <span id="karaoke-onscreen-status-text">Waiting for phone...</span>
+              </div>
+              <div class="karaoke-cason-hint">💡 Cason Bluetooth Mic: Pair in TV Sound Settings</div>
+            </div>
           </div>
 
           <div class="player-header-card">

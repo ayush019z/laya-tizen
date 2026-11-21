@@ -1,11 +1,11 @@
 {
   "version": "1.3.7",
-  "build": 145,
+  "build": 146,
   "releaseDate": "2026-11-21",
   "minTizenVersion": "3.0",
   "updateUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/version.json",
   "bundleBaseUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/",
-  "changelog": "Instant Playlist Importer (Spotify, JioSaavn, Apple Music, text songlists), Phone as Wireless Karaoke Microphone with studio reverb/echo, and Samsung OneRemote Play/Pause + Channel Rocker skip bindings.",
+  "changelog": "Prominent top-bar and library Import Playlist options, on-screen Karaoke stage live QR Code HUD, and resilient dynamic DOM self-provisioning.",
   "files": [
     "index.html",
     "mic.html",

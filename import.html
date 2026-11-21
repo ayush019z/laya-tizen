@@ -147,7 +147,7 @@
       <svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:#ff2a6d;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
       <span>Laya Importer</span>
     </div>
-    <div class="badge">TV LINKED</div>
+    <div class="badge" id="tv-room-badge">TV LINKED</div>
   </div>
 
   <div class="import-card">
@@ -176,6 +176,13 @@
   </div>
 
   <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const room = urlParams.get('room');
+    if (room) {
+      const badge = document.getElementById('tv-room-badge');
+      if (badge) badge.textContent = 'TV: ' + room;
+    }
+
     const submitBtn = document.getElementById('btn-submit-import');
     const input = document.getElementById('playlist-input');
     const resultBox = document.getElementById('result-box');
@@ -192,6 +199,7 @@
 
       try {
         localStorage.setItem('layatv_pending_import', JSON.stringify({
+          content: val,
           url: val,
           timestamp: Date.now()
         }));

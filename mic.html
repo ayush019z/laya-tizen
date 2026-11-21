@@ -187,9 +187,12 @@
       <svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:#ff2a6d;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
       <span>Laya Karaoke Mic</span>
     </div>
-    <div id="status-pill" class="status-pill">
-      <div class="dot"></div>
-      <span id="status-text">Ready</span>
+    <div style="display: flex; gap: 8px; align-items: center;">
+      <div id="room-code-tag" style="font-size: 11px; font-weight: 800; padding: 4px 10px; background: rgba(255, 42, 109, 0.2); border: 1px solid #ff2a6d; border-radius: 12px; color: #ff2a6d;">ROOM: --</div>
+      <div id="status-pill" class="status-pill">
+        <div class="dot"></div>
+        <span id="status-text">Ready</span>
+      </div>
     </div>
   </div>
 
@@ -229,6 +232,11 @@
   </div>
 
   <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomCode = urlParams.get('room') || 'STAGE-1';
+    const roomTag = document.getElementById('room-code-tag');
+    if (roomTag) roomTag.textContent = roomCode;
+
     let isLive = false;
     let audioCtx = null;
     let micStream = null;

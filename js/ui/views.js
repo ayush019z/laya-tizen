@@ -17,6 +17,7 @@ class UIViewController {
   }
 
   init() {
+    this.ensureDynamicDOM();
     if (window.Queue && window.MusicProvider && window.MusicProvider.curatedCatalogue) {
       window.Queue.setQueue(window.MusicProvider.curatedCatalogue, 0);
       const first = window.Queue.getCurrentTrack();
@@ -40,6 +41,13 @@ class UIViewController {
   }
 
   setupTopBar() {
+    const importBtn = document.getElementById('btn-header-import');
+    if (importBtn) {
+      importBtn.addEventListener('click', () => {
+        this.openImportModal();
+      });
+    }
+
     const backBtn = document.getElementById('btn-header-back');
     if (backBtn) {
       backBtn.addEventListener('click', () => {
@@ -501,6 +509,15 @@ class UIViewController {
     const importedPlaylists = window.Library.getPlaylists ? window.Library.getPlaylists() : [];
 
     let html = `
+      <div class="import-promo-banner focusable" tabindex="0" id="banner-import-playlist" data-focus-name="Import External Playlists">
+        <div class="import-promo-icon">📲</div>
+        <div class="import-promo-text">
+          <div class="import-promo-title">Import Playlists from Spotify, Apple Music & JioSaavn</div>
+          <div class="import-promo-sub">Click here or scan on your phone to instantly sync playlists to your TV</div>
+        </div>
+        <button class="pill-opt-btn" style="background: #1db954; color: #fff; padding: 10px 20px; font-weight: 700; pointer-events: none;">Import Now</button>
+      </div>
+
       <div class="shelf">
         <div class="shelf-title">Liked Songs ❤️ (${favorites.length})</div>
         <div class="track-list">
@@ -559,6 +576,13 @@ class UIViewController {
     `;
 
     container.innerHTML = html;
+
+    const promoBanner = container.querySelector('#banner-import-playlist');
+    if (promoBanner) {
+      promoBanner.addEventListener('click', () => {
+        this.openImportModal();
+      });
+    }
 
     // Attach listeners
     container.querySelectorAll('.recognized-track-row').forEach(row => {
@@ -1546,7 +1570,8 @@ class UIViewController {
       // Exit screensaver if active
       this.exitScreensaver();
       fsPlayer.classList.add('karaoke-stage-active');
-      this.showToast('🎤 Vocals Mode Active: Vocals Reduced & Full-Screen Lyrics!');
+      this.renderKaraokeOnscreenQR();
+      this.showToast('🎤 Vocals Mode Active: Scan QR code on screen to sing live!');
       
       const exitBtn = document.getElementById('btn-exit-karaoke');
       if (exitBtn && window.SpatialNav) {
@@ -1556,6 +1581,29 @@ class UIViewController {
       fsPlayer.classList.remove('karaoke-stage-active');
       document.querySelectorAll('.vocal-sing-ball').forEach(b => b.remove());
       this.showToast('Vocals Mode Turned Off');
+    }
+  }
+
+  getPublicMobileUrl(page) {
+    const origin = window.location.origin;
+    if (origin && origin.startsWith('http')) {
+      return `${origin}/${page}?room=${this.roomCode}`;
+    }
+    return `https://ayush019z.github.io/laya-tizen/${page}?room=${this.roomCode}`;
+  }
+
+  renderKaraokeOnscreenQR() {
+    this.ensureDynamicDOM();
+    const qrTarget = document.getElementById('karaoke-onscreen-qr');
+    if (!qrTarget) return;
+
+    const micUrl = this.getPublicMobileUrl('mic.html');
+    if (window.generateQRCodeSVG) {
+      try {
+        qrTarget.innerHTML = window.generateQRCodeSVG(micUrl, 175);
+      } catch (err) {
+        console.warn('On-screen QR generation error:', err);
+      }
     }
   }
 
@@ -1627,13 +1675,14 @@ class UIViewController {
   }
 
   openMicModal() {
+    this.ensureDynamicDOM();
     const modal = document.getElementById('mic-modal');
     if (!modal) return;
     modal.style.display = 'flex';
     modal.classList.add('active');
 
     const qrTarget = document.getElementById('mic-qr-canvas');
-    const micUrl = window.location.origin ? (window.location.origin + '/mic.html') : 'http://layatv.local/mic.html';
+    const micUrl = this.getPublicMobileUrl('mic.html');
     if (qrTarget && window.generateQRCodeSVG) {
       try {
         qrTarget.innerHTML = window.generateQRCodeSVG(micUrl, 236);
@@ -1673,6 +1722,11 @@ class UIViewController {
     const openBtn = document.getElementById('btn-open-importer');
     if (openBtn) {
       openBtn.addEventListener('click', () => this.openImportModal());
+    }
+
+    const headerImportBtn = document.getElementById('btn-header-import');
+    if (headerImportBtn) {
+      headerImportBtn.addEventListener('click', () => this.openImportModal());
     }
 
     const closeBtn = document.getElementById('btn-close-import');
@@ -1715,13 +1769,14 @@ class UIViewController {
   }
 
   openImportModal() {
+    this.ensureDynamicDOM();
     const modal = document.getElementById('import-modal');
     if (!modal) return;
     modal.style.display = 'flex';
     modal.classList.add('active');
 
     const qrTarget = document.getElementById('import-qr-canvas');
-    const importUrl = window.location.origin ? (window.location.origin + '/import.html') : 'http://layatv.local/import.html';
+    const importUrl = this.getPublicMobileUrl('import.html');
     if (qrTarget && window.generateQRCodeSVG) {
       try {
         qrTarget.innerHTML = window.generateQRCodeSVG(importUrl, 236);
@@ -1807,6 +1862,76 @@ class UIViewController {
       setTimeout(() => {
         if (progressBox) progressBox.style.display = 'none';
       }, 3000);
+    }
+  }
+
+  ensureDynamicDOM() {
+    // 1. Top bar Import button
+    if (!document.getElementById('btn-header-import')) {
+      const partyBtn = document.getElementById('btn-header-party');
+      if (partyBtn && partyBtn.parentNode) {
+        const btn = document.createElement('button');
+        btn.id = 'btn-header-import';
+        btn.className = 'party-pill-btn focusable';
+        btn.tabIndex = 0;
+        btn.title = 'Import Playlist';
+        btn.setAttribute('data-focus-name', 'Import Playlist');
+        btn.style.cssText = 'background: rgba(29, 185, 84, 0.2); border: 1.5px solid #1db954; color: #1ed760;';
+        btn.innerHTML = '<svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: currentColor;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg><span>Import Playlist</span>';
+        btn.addEventListener('click', () => this.openImportModal());
+        partyBtn.parentNode.insertBefore(btn, partyBtn);
+      }
+    }
+
+    // 2. On-screen Karaoke Mic Card in player hero column
+    if (!document.getElementById('karaoke-mic-onscreen-card')) {
+      const heroCol = document.querySelector('.player-hero-column');
+      if (heroCol) {
+        const card = document.createElement('div');
+        card.id = 'karaoke-mic-onscreen-card';
+        card.className = 'karaoke-mic-onscreen-card focusable';
+        card.tabIndex = 0;
+        card.title = 'Wireless Mic Options';
+        card.setAttribute('data-focus-name', 'Wireless Mic Options');
+        card.innerHTML = `
+          <div class="karaoke-mic-card-header">
+            <span class="karaoke-mic-badge-icon">🎙️</span>
+            <div class="karaoke-mic-text-group">
+              <div class="karaoke-mic-headline">Wireless Karaoke Mic</div>
+              <div class="karaoke-mic-tagline">Scan with phone to sing live</div>
+            </div>
+          </div>
+          <div id="karaoke-onscreen-qr" class="karaoke-onscreen-qr"></div>
+          <div class="karaoke-mic-card-footer">
+            <div id="karaoke-onscreen-status-pill" class="karaoke-mic-status-pill disconnected">
+              <span class="status-indicator-dot"></span>
+              <span id="karaoke-onscreen-status-text">Waiting for phone...</span>
+            </div>
+            <div class="karaoke-cason-hint">💡 Cason Bluetooth Mic: Pair in TV Sound Settings</div>
+          </div>
+        `;
+        card.addEventListener('click', () => this.openMicModal());
+        const artFrame = heroCol.querySelector('.player-art-frame');
+        if (artFrame && artFrame.nextSibling) {
+          heroCol.insertBefore(card, artFrame.nextSibling);
+        } else {
+          heroCol.appendChild(card);
+        }
+      }
+    }
+
+    // 3. Fallback bootloader for PlaylistImporter
+    if (!window.PlaylistImporter) {
+      try {
+        const cached = localStorage.getItem('layatv_ota_file_js/providers/playlist-importer.js');
+        const s = document.createElement('script');
+        if (cached && cached.trim().length > 0) {
+          s.textContent = cached;
+        } else {
+          s.src = 'js/providers/playlist-importer.js';
+        }
+        document.body.appendChild(s);
+      } catch(e) {}
     }
   }
 

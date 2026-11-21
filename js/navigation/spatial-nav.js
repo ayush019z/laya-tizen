@@ -77,6 +77,9 @@ class SpatialNavigator {
                 element.getAttribute('title');
 
     const nameMap = {
+      'btn-header-import': 'Import Playlist',
+      'banner-import-playlist': 'Import Playlist',
+      'karaoke-mic-onscreen-card': 'Wireless Mic Options',
       'btn-karaoke-stage': 'Vocals Mode',
       'btn-wireless-mic': 'Wireless Mic',
       'btn-karaoke-connect-mic': 'Phone Mic',
