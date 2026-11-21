@@ -534,14 +534,14 @@ class UIViewController {
 
     html += `</div></div>`;
 
-    // Imported & Curated Playlists section
+    // Imported Playlists section
     html += `
       <div class="shelf">
-        <div class="shelf-title">Playlists & Imported Mixes (${importedPlaylists.length + 2})</div>
+        <div class="shelf-title">Playlists & Imported Mixes (${importedPlaylists.length})</div>
         <div class="shelf-track-container">
     `;
 
-    // 1. Render user imported playlists first
+    // Render user imported playlists
     if (importedPlaylists.length > 0) {
       importedPlaylists.forEach(pl => {
         html += `
@@ -552,20 +552,11 @@ class UIViewController {
           </div>
         `;
       });
+    } else {
+      html += `<div style="padding: 24px; color: var(--text-dim); font-size: 15px;">No imported playlists yet. Click "Import Now" above or scan on your phone to add playlists!</div>`;
     }
 
-    // 2. Curated playlists
     html += `
-          <div class="media-card focusable" tabindex="0" data-playlist="chill">
-            <div class="media-card-artwork"><img src="https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&auto=format&fit=crop&q=80"/></div>
-            <div class="media-card-title">Chill Soundscapes</div>
-            <div class="media-card-author">5 Tracks • Ambient</div>
-          </div>
-          <div class="media-card focusable" tabindex="0" data-playlist="trending">
-            <div class="media-card-artwork"><img src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80"/></div>
-            <div class="media-card-title">Short n' Sweet Hits</div>
-            <div class="media-card-author">Sabrina & Friends</div>
-          </div>
         </div>
       </div>
     `;
@@ -602,15 +593,6 @@ class UIViewController {
           this.openFullscreenPlayer();
           this.showToast(`▶️ Playing "${pl.title}" (${pl.tracks.length} songs)`);
         }
-      });
-    });
-
-    container.querySelectorAll('[data-playlist]').forEach(card => {
-      card.addEventListener('click', () => {
-        const tracks = window.MusicProvider.curatedCatalogue;
-        window.Queue.setQueue(tracks, 0);
-        window.AudioPlayer.playTrack(tracks[0]);
-        this.openFullscreenPlayer();
       });
     });
   }

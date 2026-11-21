@@ -1,11 +1,11 @@
 {
   "version": "1.3.9",
-  "build": 155,
+  "build": 156,
   "releaseDate": "2026-11-21",
   "minTizenVersion": "3.0",
   "updateUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/version.json",
   "bundleBaseUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/",
-  "changelog": "Real-time Phone <-> TV remote bridge via ntfy.sh, handshake validation to prevent fake connections, Cason & Bluetooth mic pairing guide, complete modal overlay styles, and removed top header import button (library only).",
+  "changelog": "Removed pre-added demo playlists from Library (now exclusively displays user-imported playlists), real two-way phone remote bridge, and modal styling fixes.",
   "files": [
     "index.html",
     "mic.html",
