@@ -291,7 +291,13 @@ class RemoteKeyController {
       return;
     }
 
-    // 2. If inside a sub-screen (Search, Library, Details) and not on Home, return to Home
+    // 2. If inside playlist view, return to Library
+    if (window.UIController && window.UIController.currentView === 'playlist') {
+      window.UIController.switchView('library');
+      return;
+    }
+
+    // 3. If inside a sub-screen (Search, Library, Details) and not on Home, return to Home
     if (window.UIController && window.UIController.currentView !== 'home') {
       window.UIController.switchView('home');
       return;

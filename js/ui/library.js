@@ -152,6 +152,29 @@ class LibraryStore {
     return playlist;
   }
 
+  getPlaylist(playlistId) {
+    return (this.playlists || []).find(p => p.id === playlistId) || null;
+  }
+
+  removeTrackFromPlaylist(playlistId, trackIndex) {
+    const playlist = this.getPlaylist(playlistId);
+    if (!playlist || !Array.isArray(playlist.tracks)) return null;
+
+    if (trackIndex >= 0 && trackIndex < playlist.tracks.length) {
+      const removed = playlist.tracks.splice(trackIndex, 1)[0];
+      playlist.trackCount = playlist.tracks.length;
+      if (playlist.tracks.length > 0) {
+        playlist.artwork = playlist.tracks[0].artwork || playlist.artwork;
+      }
+      this.save(this.storageKeyPlaylists, this.playlists);
+      if (window.UIController) {
+        window.UIController.showToast(`Removed "${removed.title}" from playlist`);
+      }
+      return playlist;
+    }
+    return null;
+  }
+
   deletePlaylist(playlistId) {
     this.playlists = this.playlists.filter(p => p.id !== playlistId);
     this.save(this.storageKeyPlaylists, this.playlists);

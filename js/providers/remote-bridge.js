@@ -7,6 +7,7 @@ class RemoteBridgeService {
   constructor() {
     this.roomCode = null;
     this.isTV = false;
+    this.clientType = 'phone';
     this.connected = false;
     this.callbacks = [];
     this.eventSource = null;
@@ -28,14 +29,15 @@ class RemoteBridgeService {
     }, 3500);
   }
 
-  initMobile(roomCode, onMessage) {
+  initMobile(roomCode, onMessage, clientType = 'phone') {
     this.isTV = false;
+    this.clientType = clientType;
     this.roomCode = (roomCode || '').replace(/^LAYA-/i, '').trim();
     if (onMessage) this.callbacks.push(onMessage);
     this.connectStream();
 
-    // Announce mobile presence immediately
-    this.send({ type: 'PHONE_HELLO', room: this.roomCode, time: Date.now() });
+    // Announce mobile presence immediately with client identity
+    this.send({ type: 'PHONE_HELLO', client: this.clientType, room: this.roomCode, time: Date.now() });
   }
 
   connectStream() {
@@ -56,7 +58,7 @@ class RemoteBridgeService {
           this.connected = true;
           console.log('[RemoteBridge] SSE connected:', subTopic);
           if (!this.isTV) {
-            this.send({ type: 'PHONE_HELLO', room: this.roomCode, time: Date.now() });
+            this.send({ type: 'PHONE_HELLO', client: this.clientType, room: this.roomCode, time: Date.now() });
           }
         };
 
@@ -89,7 +91,7 @@ class RemoteBridgeService {
         this.connected = true;
         console.log('[RemoteBridge] WebSocket connected:', subTopic);
         if (!this.isTV) {
-          this.send({ type: 'PHONE_HELLO', room: this.roomCode, time: Date.now() });
+          this.send({ type: 'PHONE_HELLO', client: this.clientType, room: this.roomCode, time: Date.now() });
         }
       };
       this.ws.onmessage = (event) => {

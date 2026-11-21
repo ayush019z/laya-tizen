@@ -115,6 +115,11 @@ class UIViewController {
       this.renderHistory();
     } else if (viewName === 'library') {
       this.renderLibrary();
+    } else if (viewName === 'playlist') {
+      if (this.currentPlaylistId && window.Library) {
+        const pl = window.Library.getPlaylist(this.currentPlaylistId);
+        if (pl) this.renderPlaylistDetails(pl);
+      }
     } else if (viewName === 'settings') {
       this.renderSettings();
     } else if (viewName === 'search') {
@@ -127,6 +132,14 @@ class UIViewController {
     // Direct focus to first element in new view
     setTimeout(() => {
       if (window.SpatialNav) {
+        if (viewName === 'playlist') {
+          const playAllBtn = activeScreen ? (activeScreen.querySelector('#btn-pl-play-all') || activeScreen.querySelector('#btn-pl-back')) : null;
+          if (playAllBtn) {
+            window.SpatialNav.setFocus(playAllBtn);
+            return;
+          }
+        }
+
         if (viewName === 'search') {
           // On Search screen, focus the 'Q' key on the QWERTY keyboard
           const keys = activeScreen ? Array.from(activeScreen.querySelectorAll('.key-btn')) : [];
@@ -586,12 +599,192 @@ class UIViewController {
     container.querySelectorAll('[data-imported-id]').forEach(card => {
       card.addEventListener('click', () => {
         const plId = card.getAttribute('data-imported-id');
-        const pl = importedPlaylists.find(p => p.id === plId);
-        if (pl && pl.tracks && pl.tracks.length > 0) {
-          window.Queue.setQueue(pl.tracks, 0);
-          window.AudioPlayer.playTrack(pl.tracks[0]);
+        this.openPlaylistView(plId);
+      });
+    });
+  }
+
+  // --- 4b. Dedicated Playlist Details View (Full Music Player Screen) ---
+  openPlaylistView(playlistId) {
+    const pl = window.Library && window.Library.getPlaylist ? window.Library.getPlaylist(playlistId) : null;
+    if (!pl) {
+      this.showToast('Playlist not found');
+      return;
+    }
+    this.currentPlaylistId = playlistId;
+    this.renderPlaylistDetails(pl);
+    this.switchView('playlist');
+  }
+
+  renderPlaylistDetails(pl) {
+    const container = document.getElementById('playlist-view-content');
+    if (!container) return;
+
+    const tracks = pl.tracks || [];
+    const title = pl.title || pl.name || 'Untitled Playlist';
+    const artwork = pl.artwork || (tracks[0] ? tracks[0].artwork : 'assets/icon.png');
+    const source = (pl.source || pl.sourceUrl) ? ((pl.sourceUrl && pl.sourceUrl.includes('apple')) ? 'Apple Music' : (pl.sourceUrl && pl.sourceUrl.includes('spotify')) ? 'Spotify' : 'Imported') : 'Custom Mix';
+
+    let totalSecs = 0;
+    tracks.forEach(t => {
+      if (t.durationFormatted) {
+        const parts = t.durationFormatted.split(':');
+        if (parts.length === 2) totalSecs += parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+      } else {
+        totalSecs += 210;
+      }
+    });
+    const hours = Math.floor(totalSecs / 3600);
+    const mins = Math.floor((totalSecs % 3600) / 60);
+    const durationStr = hours > 0 ? `${hours} hr ${mins} min` : `${mins} min`;
+
+    let html = `
+      <div class="playlist-header">
+        <button id="btn-pl-back" class="pl-back-btn focusable" tabindex="0" data-focus-name="Back to Library">
+          <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; fill: currentColor;"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+          <span>← Back to Library</span>
+        </button>
+
+        <div class="playlist-hero-card">
+          <div class="playlist-hero-art">
+            <img src="${artwork}" alt="${title}"/>
+          </div>
+          <div class="playlist-hero-info">
+            <div class="playlist-hero-badge">PLAYLIST • ${source}</div>
+            <h1 class="playlist-hero-title">${title}</h1>
+            <div class="playlist-hero-meta">
+              <span>${tracks.length} songs</span>
+              <span class="meta-dot">•</span>
+              <span>${durationStr}</span>
+              <span class="meta-dot">•</span>
+              <span>${window.Library.getRelativeTime(pl.createdAt)}</span>
+            </div>
+
+            <div class="playlist-action-bar">
+              <button id="btn-pl-play-all" class="pl-btn-play focusable" tabindex="0" data-focus-name="Play All">
+                <svg viewBox="0 0 24 24" style="width: 22px; height: 22px; fill: currentColor;"><path d="M8 5v14l11-7z"/></svg>
+                <span>Play All</span>
+              </button>
+              <button id="btn-pl-shuffle" class="pl-btn-secondary focusable" tabindex="0" data-focus-name="Shuffle Playlist">
+                <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; fill: currentColor;"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+                <span>Shuffle</span>
+              </button>
+              <button id="btn-pl-delete" class="pl-btn-danger focusable" tabindex="0" data-focus-name="Delete Playlist">
+                <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; fill: currentColor;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                <span>Delete Playlist</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="playlist-tracks-section">
+        <div class="pl-track-list-header">
+          <span style="width: 44px; text-align: center;">#</span>
+          <span style="flex: 1;">TITLE & ARTIST</span>
+          <span style="width: 120px; text-align: right;">DURATION</span>
+          <span style="width: 90px; text-align: center;">REMOVE</span>
+        </div>
+
+        <div class="pl-track-list" id="pl-track-list-body">
+    `;
+
+    if (tracks.length > 0) {
+      tracks.forEach((t, idx) => {
+        const num = (idx + 1 < 10 ? '0' : '') + (idx + 1);
+        html += `
+          <div class="pl-track-row focusable" tabindex="0" data-track-index="${idx}" data-focus-name="${t.title}">
+            <div class="pl-track-idx">${num}</div>
+            <div class="pl-track-thumb">
+              <img src="${t.artwork || 'assets/icon.png'}" alt=""/>
+            </div>
+            <div class="pl-track-meta">
+              <div class="pl-track-title">${t.title}</div>
+              <div class="pl-track-artist">${t.artist || 'Unknown Artist'}</div>
+            </div>
+            <div class="pl-track-duration">${t.durationFormatted || '3:30'}</div>
+            <button class="pl-btn-remove focusable" tabindex="0" data-remove-index="${idx}" title="Remove song from playlist" data-focus-name="Remove ${t.title}">
+              <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: currentColor;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+            </button>
+          </div>
+        `;
+      });
+    } else {
+      html += `<div style="padding: 40px; text-align: center; color: var(--text-dim); font-size: 16px;">This playlist has no songs remaining.</div>`;
+    }
+
+    html += `
+        </div>
+      </div>
+    `;
+
+    container.innerHTML = html;
+
+    // Attach Event Listeners
+    const backBtn = container.querySelector('#btn-pl-back');
+    if (backBtn) {
+      backBtn.addEventListener('click', () => {
+        this.switchView('library');
+      });
+    }
+
+    const playAllBtn = container.querySelector('#btn-pl-play-all');
+    if (playAllBtn) {
+      playAllBtn.addEventListener('click', () => {
+        if (tracks.length > 0) {
+          window.Queue.setQueue(tracks, 0);
+          window.AudioPlayer.playTrack(tracks[0]);
           this.openFullscreenPlayer();
-          this.showToast(`▶️ Playing "${pl.title || pl.name}" (${pl.tracks.length} songs)`);
+          this.showToast(`▶️ Playing "${title}"`);
+        }
+      });
+    }
+
+    const shuffleBtn = container.querySelector('#btn-pl-shuffle');
+    if (shuffleBtn) {
+      shuffleBtn.addEventListener('click', () => {
+        if (tracks.length > 0) {
+          const shuffled = [...tracks].sort(() => Math.random() - 0.5);
+          window.Queue.setQueue(shuffled, 0);
+          window.AudioPlayer.playTrack(shuffled[0]);
+          this.openFullscreenPlayer();
+          this.showToast(`🔀 Shuffling "${title}"`);
+        }
+      });
+    }
+
+    const deleteBtn = container.querySelector('#btn-pl-delete');
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', () => {
+        window.Library.deletePlaylist(pl.id);
+        this.switchView('library');
+      });
+    }
+
+    // Play specific track on row click
+    container.querySelectorAll('.pl-track-row').forEach(row => {
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('.pl-btn-remove')) return;
+        const idx = parseInt(row.getAttribute('data-track-index'), 10);
+        if (!isNaN(idx) && tracks[idx]) {
+          window.Queue.setQueue(tracks, idx);
+          window.AudioPlayer.playTrack(tracks[idx]);
+          this.openFullscreenPlayer();
+          this.showToast(`▶️ Playing "${tracks[idx].title}"`);
+        }
+      });
+    });
+
+    // Remove individual track from playlist
+    container.querySelectorAll('.pl-btn-remove').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = parseInt(btn.getAttribute('data-remove-index'), 10);
+        if (!isNaN(idx)) {
+          const updated = window.Library.removeTrackFromPlaylist(pl.id, idx);
+          if (updated) {
+            this.renderPlaylistDetails(updated);
+          }
         }
       });
     });
@@ -1506,16 +1699,37 @@ class UIViewController {
     }
   }
 
-  handleGuestSongArrival(track) {
+  async handleGuestSongArrival(track) {
     if (!track) return;
+    this.showToast(`🎉 Guest queued "${track.title}"!`);
+
+    // If streamUrl is missing (e.g. from iTunes mobile web search), resolve it via JioSaavn
+    if (!track.streamUrl && window.MusicProvider) {
+      try {
+        const query = `${track.title} ${track.artist || ''}`.trim();
+        const searchResults = await window.MusicProvider.search(query);
+        if (searchResults && searchResults.length > 0) {
+          const match = searchResults[0];
+          track.streamUrl = match.streamUrl;
+          track.id = match.id || track.id;
+          if (!track.artwork || track.artwork.includes('placeholder')) {
+            track.artwork = match.artwork;
+          }
+          if (match.lyrics) track.lyrics = match.lyrics;
+        }
+      } catch (err) {
+        console.warn('[PartyJukebox] Failed to resolve streamUrl for guest track:', err);
+      }
+    }
+
     if (window.Queue) {
       window.Queue.addTrack(track);
     }
-    this.showToast(`🎉 Guest added "${track.title}" to Up Next!`);
     
     // If nothing currently playing, start playing guest's song
     if (window.AudioPlayer && (!window.AudioPlayer.currentTrack || window.AudioPlayer.audio.paused)) {
       window.AudioPlayer.playTrack(track);
+      this.openFullscreenPlayer();
     }
   }
 
@@ -1735,23 +1949,38 @@ class UIViewController {
     if (!data || !data.type) return;
 
     if (data.type === 'PHONE_HELLO' || data.type === 'MIC_PING') {
+      const client = data.client || 'phone';
       const statusPill = document.getElementById('mic-connection-status');
       const statusText = document.getElementById('mic-status-text');
       const onscreenPill = document.getElementById('karaoke-onscreen-status-pill');
       const onscreenText = document.getElementById('karaoke-onscreen-status-text');
 
-      if (statusPill) {
-        statusPill.className = 'mic-status-pill connected';
-        if (statusText) statusText.textContent = 'Phone Mic Connected (Live)';
-      }
-      if (onscreenPill) {
-        onscreenPill.className = 'karaoke-mic-status-pill connected';
-        if (onscreenText) onscreenText.textContent = 'Phone Mic Connected (Live)';
+      if (client === 'mic') {
+        if (statusPill) {
+          statusPill.className = 'mic-status-pill connected';
+          if (statusText) statusText.textContent = 'Phone Linked (Ready)';
+        }
+        if (onscreenPill) {
+          onscreenPill.className = 'karaoke-mic-status-pill connected';
+          if (onscreenText) onscreenText.textContent = 'Phone Linked (Ready)';
+        }
+        this.showToast('📱 Wireless Mic Linked! Tap mic on phone to sing.');
+      } else if (client === 'party') {
+        this.showToast('🎉 Guest joined Party Jukebox!');
+      } else if (client === 'import') {
+        this.showToast('📥 Phone connected to Playlist Importer!');
+      } else {
+        if (statusPill) {
+          statusPill.className = 'mic-status-pill connected';
+          if (statusText) statusText.textContent = 'Phone Linked (Ready)';
+        }
+        if (onscreenPill) {
+          onscreenPill.className = 'karaoke-mic-status-pill connected';
+          if (onscreenText) onscreenText.textContent = 'Phone Linked (Ready)';
+        }
       }
 
-      this.showToast('🎙️ Phone Connected to TV!');
-
-      // Send ACK back to phone via WebSocket!
+      // Send ACK back to phone via RemoteBridge!
       if (window.RemoteBridge) {
         window.RemoteBridge.send({
           type: 'TV_ACK',
@@ -1768,21 +1997,22 @@ class UIViewController {
 
       if (data.active) {
         if (statusPill) {
-          statusPill.className = 'mic-status-pill connected';
+          statusPill.className = 'mic-status-pill live';
           if (statusText) statusText.textContent = '🔴 Phone Singing Live!';
         }
         if (onscreenPill) {
-          onscreenPill.className = 'karaoke-mic-status-pill connected';
+          onscreenPill.className = 'karaoke-mic-status-pill live';
           if (onscreenText) onscreenText.textContent = '🔴 Phone Singing Live!';
         }
+        this.showToast('🎤 Mobile Mic is now LIVE!');
       } else {
         if (statusPill) {
-          statusPill.className = 'mic-status-pill';
-          if (statusText) statusText.textContent = 'Phone Muted (Ready)';
+          statusPill.className = 'mic-status-pill connected';
+          if (statusText) statusText.textContent = 'Phone Linked (Muted)';
         }
         if (onscreenPill) {
-          onscreenPill.className = 'karaoke-mic-status-pill';
-          if (onscreenText) onscreenText.textContent = 'Phone Muted (Ready)';
+          onscreenPill.className = 'karaoke-mic-status-pill connected';
+          if (onscreenText) onscreenText.textContent = 'Phone Linked (Muted)';
         }
       }
 

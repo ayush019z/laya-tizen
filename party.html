@@ -4,21 +4,24 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Laya — Party Jukebox</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #000000;
-      --glass: rgba(28, 28, 38, 0.75);
+      --bg: #09090f;
+      --glass: rgba(22, 22, 32, 0.85);
       --glass-border: rgba(255, 255, 255, 0.12);
       --accent: #ff2a6d;
-      --accent-glow: rgba(255, 42, 109, 0.5);
+      --accent-glow: rgba(255, 42, 109, 0.45);
+      --green: #4ade80;
       --text: #ffffff;
       --sub: rgba(255, 255, 255, 0.65);
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
     body {
       background: var(--bg);
       color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
@@ -28,7 +31,7 @@
     .ambient-glow {
       position: fixed;
       inset: -30%;
-      background: radial-gradient(circle at 50% 20%, rgba(255, 42, 109, 0.25), transparent 60%);
+      background: radial-gradient(circle at 50% 15%, rgba(255, 42, 109, 0.22), transparent 60%);
       filter: blur(80px);
       pointer-events: none;
       z-index: 0;
@@ -70,6 +73,12 @@
       border: 1px solid var(--accent);
       padding: 4px 10px;
       border-radius: 12px;
+      transition: all 0.3s ease;
+    }
+    .room-badge.connected {
+      color: var(--green);
+      background: rgba(74, 222, 128, 0.15);
+      border-color: var(--green);
     }
     .search-box {
       display: flex;
@@ -81,6 +90,7 @@
       border-radius: 20px;
       padding: 12px 18px;
       gap: 12px;
+      position: relative;
     }
     .search-input {
       flex: 1;
@@ -91,6 +101,30 @@
       outline: none;
     }
     .search-input::placeholder { color: var(--sub); }
+    .search-spinner {
+      display: none;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    .search-spinner.active { display: block; }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .section-header {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--sub);
+      padding: 4px 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
     .track-list {
       display: flex;
       flex-direction: column;
@@ -100,7 +134,7 @@
       display: flex;
       align-items: center;
       gap: 14px;
-      padding: 12px 16px;
+      padding: 10px 14px;
       background: var(--glass);
       backdrop-filter: blur(40px);
       -webkit-backdrop-filter: blur(40px);
@@ -114,9 +148,10 @@
       border-radius: 12px;
       object-fit: cover;
       background: #181824;
+      flex-shrink: 0;
     }
     .track-info { flex: 1; min-width: 0; }
-    .track-name { font-size: 16px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .track-name { font-size: 15px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .track-artist { font-size: 13px; color: var(--sub); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .add-btn {
       background: var(--accent);
@@ -128,15 +163,30 @@
       font-size: 13px;
       cursor: pointer;
       box-shadow: 0 4px 14px var(--accent-glow);
-      transition: transform 0.15s;
+      transition: all 0.2s;
+      flex-shrink: 0;
     }
     .add-btn:active { transform: scale(0.92); }
+    .add-btn.queued {
+      background: rgba(74, 222, 128, 0.25);
+      border: 1px solid var(--green);
+      color: var(--green);
+      box-shadow: none;
+      pointer-events: none;
+    }
+    .empty-state {
+      padding: 40px 20px;
+      text-align: center;
+      color: var(--sub);
+      font-size: 14px;
+      line-height: 1.5;
+    }
     .toast {
       position: fixed;
       bottom: 24px;
       left: 50%;
       transform: translateX(-50%) translateY(100px);
-      background: rgba(30, 30, 42, 0.95);
+      background: rgba(22, 22, 32, 0.95);
       border: 1px solid var(--accent);
       color: #fff;
       padding: 12px 24px;
@@ -146,6 +196,7 @@
       box-shadow: 0 10px 30px rgba(0,0,0,0.8);
       transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
       z-index: 100;
+      white-space: nowrap;
     }
     .toast.show { transform: translateX(-50%) translateY(0); }
   </style>
@@ -165,7 +216,13 @@
 
     <div class="search-box">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="rgba(255,255,255,0.7)"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-      <input type="text" id="phone-search" class="search-input" placeholder="Search song or artist..." autocomplete="off">
+      <input type="text" id="phone-search" class="search-input" placeholder="Search any song in the world..." autocomplete="off">
+      <div class="search-spinner" id="search-spinner"></div>
+    </div>
+
+    <div class="section-header">
+      <span id="list-title">Trending Party Hits</span>
+      <span id="results-count">26 songs</span>
     </div>
 
     <div class="track-list" id="phone-results"></div>
@@ -175,46 +232,123 @@
 
   <script>
     const sampleCatalog = [
-      { id: 'curated_espresso', title: 'Espresso', artist: 'Sabrina Carpenter', artwork: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80', durationFormatted: '2:55' },
-      { id: 'party_1', title: 'Blinding Lights', artist: 'The Weeknd', artwork: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&auto=format&fit=crop&q=80', durationFormatted: '3:20' },
-      { id: 'party_2', title: 'Levitating', artist: 'Dua Lipa', artwork: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&auto=format&fit=crop&q=80', durationFormatted: '3:23' },
-      { id: 'party_3', title: 'Starboy', artist: 'The Weeknd ft. Daft Punk', artwork: 'https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?w=600&auto=format&fit=crop&q=80', durationFormatted: '3:50' },
-      { id: 'party_4', title: 'Cruel Summer', artist: 'Taylor Swift', artwork: 'https://images.unsplash.com/photo-1445985543469-221e57446c70?w=600&auto=format&fit=crop&q=80', durationFormatted: '2:58' },
-      { id: 'party_5', title: 'As It Was', artist: 'Harry Styles', artwork: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=600&auto=format&fit=crop&q=80', durationFormatted: '2:47' }
+      { id: 'party_lover', title: 'Lover', artist: 'Diljit Dosanjh', artwork: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80', durationFormatted: '3:05' },
+      { id: 'party_tauba', title: 'Tauba Tauba', artist: 'Karan Aujla', artwork: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&auto=format&fit=crop&q=80', durationFormatted: '3:27' },
+      { id: 'party_kesariya', title: 'Kesariya', artist: 'Arijit Singh, Pritam', artwork: 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=600&auto=format&fit=crop&q=80', durationFormatted: '4:28' },
+      { id: 'party_blinding', title: 'Blinding Lights', artist: 'The Weeknd', artwork: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&auto=format&fit=crop&q=80', durationFormatted: '3:20' },
+      { id: 'party_espresso', title: 'Espresso', artist: 'Sabrina Carpenter', artwork: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80', durationFormatted: '2:55' },
+      { id: 'party_withyou', title: 'With You', artist: 'AP Dhillon', artwork: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80', durationFormatted: '2:34' },
+      { id: 'party_chaleya', title: 'Chaleya', artist: 'Arijit Singh, Shilpa Rao', artwork: 'https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?w=600&auto=format&fit=crop&q=80', durationFormatted: '3:20' },
+      { id: 'party_levitating', title: 'Levitating', artist: 'Dua Lipa', artwork: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&auto=format&fit=crop&q=80', durationFormatted: '3:23' },
+      { id: 'party_starboy', title: 'Starboy', artist: 'The Weeknd ft. Daft Punk', artwork: 'https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?w=600&auto=format&fit=crop&q=80', durationFormatted: '3:50' },
+      { id: 'party_softly', title: 'Softly', artist: 'Karan Aujla, Ikky', artwork: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=600&auto=format&fit=crop&q=80', durationFormatted: '2:36' },
+      { id: 'party_cruel', title: 'Cruel Summer', artist: 'Taylor Swift', artwork: 'https://images.unsplash.com/photo-1445985543469-221e57446c70?w=600&auto=format&fit=crop&q=80', durationFormatted: '2:58' },
+      { id: 'party_asitwas', title: 'As It Was', artist: 'Harry Styles', artwork: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=600&auto=format&fit=crop&q=80', durationFormatted: '2:47' },
+      { id: 'party_brown', title: 'Brown Munde', artist: 'AP Dhillon, Gurinder Gill, Shinda Kahlon', artwork: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=600&auto=format&fit=crop&q=80', durationFormatted: '4:07' },
+      { id: 'party_birds', title: 'BIRDS OF A FEATHER', artist: 'Billie Eilish', artwork: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&auto=format&fit=crop&q=80', durationFormatted: '3:16' },
+      { id: 'party_borntoshine', title: 'Born to Shine', artist: 'Diljit Dosanjh', artwork: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80', durationFormatted: '3:33' },
+      { id: 'party_sunflower', title: 'Sunflower', artist: 'Post Malone, Swae Lee', artwork: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80', durationFormatted: '2:38' },
+      { id: 'party_jugnu', title: 'Jugnu', artist: 'Badshah, Nikhita Gandhi', artwork: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&auto=format&fit=crop&q=80', durationFormatted: '3:51' },
+      { id: 'party_shape', title: 'Shape of You', artist: 'Ed Sheeran', artwork: 'https://images.unsplash.com/photo-1445985543469-221e57446c70?w=600&auto=format&fit=crop&q=80', durationFormatted: '3:53' },
+      { id: 'party_notlikeus', title: 'Not Like Us', artist: 'Kendrick Lamar', artwork: 'https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?w=600&auto=format&fit=crop&q=80', durationFormatted: '4:34' },
+      { id: 'party_apna', title: 'Apna Bana Le', artist: 'Arijit Singh, Sachin-Jigar', artwork: 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=600&auto=format&fit=crop&q=80', durationFormatted: '4:21' },
+      { id: 'party_peaches', title: 'Peaches', artist: 'Justin Bieber ft. Daniel Caesar & Giveon', artwork: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=600&auto=format&fit=crop&q=80', durationFormatted: '3:18' },
+      { id: 'party_sugar', title: 'Sugar', artist: 'Maroon 5', artwork: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80', durationFormatted: '3:55' },
+      { id: 'party_onedance', title: 'One Dance', artist: 'Drake ft. Wizkid & Kyla', artwork: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=600&auto=format&fit=crop&q=80', durationFormatted: '2:54' },
+      { id: 'party_yellow', title: 'Yellow', artist: 'Coldplay', artwork: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&auto=format&fit=crop&q=80', durationFormatted: '4:29' },
+      { id: 'party_stay', title: 'Stay', artist: 'The Kid LAROI, Justin Bieber', artwork: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&auto=format&fit=crop&q=80', durationFormatted: '2:21' },
+      { id: 'party_bohemian', title: 'Bohemian Rhapsody', artist: 'Queen', artwork: 'https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?w=600&auto=format&fit=crop&q=80', durationFormatted: '5:55' }
     ];
 
     const roomParam = (new URLSearchParams(window.location.search).get('room') || '8842').replace(/^LAYA-/i, '').trim();
-    document.getElementById('room-code-tag').textContent = `ROOM: ${roomParam}`;
+    const roomTag = document.getElementById('room-code-tag');
+    roomTag.textContent = `ROOM: ${roomParam}`;
 
     if (window.RemoteBridge) {
       window.RemoteBridge.initMobile(roomParam, (data) => {
         if (data.type === 'TV_ACK') {
-          document.getElementById('room-code-tag').style.borderColor = '#4ade80';
-          document.getElementById('room-code-tag').style.color = '#4ade80';
+          roomTag.classList.add('connected');
+          roomTag.textContent = `🟢 LINKED (${roomParam})`;
         }
-      });
+      }, 'party');
     }
 
-    function renderList(items) {
+    function formatMillis(ms) {
+      if (!ms) return '3:30';
+      const totalSecs = Math.floor(ms / 1000);
+      const m = Math.floor(totalSecs / 60);
+      const s = totalSecs % 60;
+      return `${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+
+    function renderList(items, isSearchResult = false) {
       const listEl = document.getElementById('phone-results');
+      const titleEl = document.getElementById('list-title');
+      const countEl = document.getElementById('results-count');
+
       listEl.innerHTML = '';
+
+      if (isSearchResult) {
+        titleEl.textContent = 'Search Results';
+        countEl.textContent = `${items.length} songs found`;
+      } else {
+        titleEl.textContent = 'Trending Party Hits';
+        countEl.textContent = `${items.length} songs`;
+      }
+
+      if (!items || items.length === 0) {
+        listEl.innerHTML = `
+          <div class="empty-state">
+            🔍 No songs found.<br/>
+            Try searching by track name, artist, or movie.
+          </div>
+        `;
+        return;
+      }
+
       items.forEach(track => {
         const card = document.createElement('div');
         card.className = 'track-card';
         card.innerHTML = `
-          <img class="track-art" src="${track.artwork}" alt="">
+          <img class="track-art" src="${track.artwork || 'assets/icon.png'}" alt="" onerror="this.src='assets/icon.png'">
           <div class="track-info">
-            <div class="track-name">${track.title}</div>
-            <div class="track-artist">${track.artist}</div>
+            <div class="track-name">${escapeHtml(track.title)}</div>
+            <div class="track-artist">${escapeHtml(track.artist || 'Unknown Artist')} • ${track.durationFormatted || '3:30'}</div>
           </div>
-          <button class="add-btn" onclick='queueTrack(${JSON.stringify(track)})'>+ Queue</button>
+          <button class="add-btn" data-track-id="${track.id}">+ Queue</button>
         `;
+
+        const btn = card.querySelector('.add-btn');
+        btn.addEventListener('click', () => {
+          queueTrack(track, btn);
+        });
+
         listEl.appendChild(card);
       });
     }
 
-    window.queueTrack = function(track) {
-      // Send directly to TV via WebSocket RemoteBridge
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>"']/g, m => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[m]));
+    }
+
+    window.queueTrack = function(track, btnEl) {
+      if (btnEl) {
+        btnEl.classList.add('queued');
+        btnEl.textContent = '✓ Queued!';
+        setTimeout(() => {
+          btnEl.classList.remove('queued');
+          btnEl.textContent = '+ Queue';
+        }, 3000);
+      }
+
+      // Send directly to TV via RemoteBridge
       if (window.RemoteBridge) {
         window.RemoteBridge.send({ type: 'ADD_GUEST_TRACK', track: track, room: roomParam });
       }
@@ -230,14 +364,61 @@
     }
 
     const input = document.getElementById('phone-search');
+    const spinner = document.getElementById('search-spinner');
+    let searchTimeout = null;
+
     input.addEventListener('input', (e) => {
-      const q = e.target.value.toLowerCase().trim();
-      if (!q) { renderList(sampleCatalog); return; }
-      const filtered = sampleCatalog.filter(t => t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q));
-      renderList(filtered);
+      const q = e.target.value.trim();
+
+      if (searchTimeout) clearTimeout(searchTimeout);
+
+      if (!q) {
+        spinner.classList.remove('active');
+        renderList(sampleCatalog, false);
+        return;
+      }
+
+      // Show spinner during typing
+      spinner.classList.add('active');
+
+      searchTimeout = setTimeout(async () => {
+        try {
+          // Perform live web search via iTunes Search API (open CORS, global catalog)
+          const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=30`);
+          if (!res.ok) throw new Error('Search request failed');
+          const data = await res.json();
+          spinner.classList.remove('active');
+
+          if (data && data.results && data.results.length > 0) {
+            const mapped = data.results.map(item => ({
+              id: `itunes_${item.trackId}`,
+              title: item.trackName,
+              artist: item.artistName,
+              artwork: item.artworkUrl100 ? item.artworkUrl100.replace('100x100bb', '600x600bb') : 'assets/icon.png',
+              durationFormatted: formatMillis(item.trackTimeMillis)
+            }));
+            renderList(mapped, true);
+          } else {
+            // Local filter fallback
+            const localFiltered = sampleCatalog.filter(t =>
+              t.title.toLowerCase().includes(q.toLowerCase()) ||
+              t.artist.toLowerCase().includes(q.toLowerCase())
+            );
+            renderList(localFiltered, true);
+          }
+        } catch (err) {
+          console.warn('Live search error, falling back to local catalog:', err);
+          spinner.classList.remove('active');
+          const localFiltered = sampleCatalog.filter(t =>
+            t.title.toLowerCase().includes(q.toLowerCase()) ||
+            t.artist.toLowerCase().includes(q.toLowerCase())
+          );
+          renderList(localFiltered, true);
+        }
+      }, 320);
     });
 
-    renderList(sampleCatalog);
+    renderList(sampleCatalog, false);
   </script>
 </body>
 </html>

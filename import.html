@@ -216,7 +216,7 @@
     const input = document.getElementById('playlist-input');
     const resultBox = document.getElementById('result-box');
 
-    // Initialize Real-time Remote Bridge via WebSockets
+    // Initialize Real-time Remote Bridge via WebSockets / SSE
     if (window.RemoteBridge) {
       window.RemoteBridge.initMobile(roomCode, (data) => {
         if (data.type === 'TV_ACK') {
@@ -247,7 +247,7 @@
             submitLabel.textContent = '⏳ TV is importing songs...';
           }
         }
-      });
+      }, 'import');
     }
 
     submitBtn.addEventListener('click', () => {

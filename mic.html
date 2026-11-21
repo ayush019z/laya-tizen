@@ -349,7 +349,7 @@
         if (data.type === 'TV_ACK') {
           onTVConnected();
         }
-      });
+      }, 'mic');
     }
 
     // Ping TV periodically until connected
@@ -357,7 +357,7 @@
     const pingTimer = setInterval(() => {
       if (!isConnectedToTV) {
         if (window.RemoteBridge) {
-          window.RemoteBridge.send({ type: 'PHONE_HELLO', room: roomCode, time: Date.now() });
+          window.RemoteBridge.send({ type: 'PHONE_HELLO', client: 'mic', room: roomCode, time: Date.now() });
         }
         pingAttempts++;
         if (pingAttempts >= 6) {
