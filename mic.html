@@ -248,6 +248,19 @@
       line-height: 1.4;
     }
   </style>
+  <script src="js/lib/paho-mqtt.min.js"></script>
+  <script>
+    if (!window.Paho) {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"><\/script>');
+    }
+  </script>
+  <script src="js/lib/peerjs.min.js"></script>
+  <script>
+    if (!window.Peer) {
+      document.write('<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"><\/script>');
+    }
+  </script>
+  <script src="js/providers/remote-bridge.js"></script>
 </head>
 <body>
   <div class="header">
@@ -329,7 +342,7 @@
     let micStream = null;
     let analyser = null;
     let animId = null;
-    let lastPollTime = Math.floor(Date.now() / 1000) - 2;
+    let phonePeer = null;
 
     const micBtn = document.getElementById('mic-btn');
     const micLabel = document.getElementById('mic-label');
@@ -342,7 +355,48 @@
     const echoNum = document.getElementById('mic-echo-num');
     const footerHint = document.getElementById('footer-hint');
 
-    // 1. Sliders broadcast live settings
+    // 1. Initialize Real-Time WebSocket Remote Bridge
+    if (window.RemoteBridge) {
+      window.RemoteBridge.initMobile(roomCode, (data) => {
+        if (data.type === 'TV_ACK') {
+          onTVConnected();
+        }
+      });
+    }
+
+    // Ping TV every 2.5 seconds until connected
+    let pingAttempts = 0;
+    const pingTimer = setInterval(() => {
+      if (!isConnectedToTV) {
+        if (window.RemoteBridge) {
+          window.RemoteBridge.send({ type: 'PHONE_HELLO', room: roomCode, time: Date.now() });
+        }
+        pingAttempts++;
+        if (pingAttempts >= 4) {
+          statusPill.className = 'status-pill error';
+          statusText.textContent = 'TV Offline';
+          micLabel.textContent = 'Code Not Found';
+          footerHint.textContent = `⚠️ Cannot find TV with code "${roomCode}". Make sure Laya TV is open on TV and code matches!`;
+        }
+      } else {
+        clearInterval(pingTimer);
+      }
+    }, 2500);
+
+    function onTVConnected() {
+      if (!isConnectedToTV) {
+        isConnectedToTV = true;
+        micBtn.classList.remove('disabled');
+        if (!isLive) {
+          statusPill.className = 'status-pill connected';
+          statusText.textContent = 'TV Connected';
+          micLabel.textContent = 'Tap to Sing';
+          footerHint.textContent = '🎉 Connected to Samsung TV! Tap mic button to start singing.';
+        }
+      }
+    }
+
+    // Sliders broadcast live settings over WebSockets
     volSlider.addEventListener('input', (e) => {
       volNum.textContent = e.target.value + '%';
       sendMicState(isLive);
@@ -353,78 +407,23 @@
       sendMicState(isLive);
     });
 
-    // 2. Real Two-Way Handshake with TV
-    async function sendToTV(payload) {
-      try {
-        await fetch(`https://ntfy.sh/layatv_tv_${roomCode}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+    function sendMicState(active) {
+      if (window.RemoteBridge) {
+        window.RemoteBridge.send({
+          type: 'MIC_STATE',
+          active,
+          volume: volSlider.value / 100,
+          echo: echoSlider.value / 100,
+          room: roomCode,
+          time: Date.now()
         });
-      } catch (err) {
-        console.warn('Network send error:', err);
       }
     }
 
-    async function pollTVResponse() {
-      try {
-        const resp = await fetch(`https://ntfy.sh/layatv_phone_${roomCode}/json?poll=1&since=${lastPollTime}`);
-        if (!resp.ok) return;
-        const text = await resp.text();
-        if (!text || !text.trim()) return;
-
-        const lines = text.trim().split('\n');
-        for (const line of lines) {
-          try {
-            const entry = JSON.parse(line);
-            if (entry.event === 'message' && entry.message) {
-              if (entry.time) lastPollTime = Math.max(lastPollTime, entry.time);
-              const data = JSON.parse(entry.message);
-              if (data.type === 'TV_ACK' && (data.room == roomCode || !data.room)) {
-                onTVConnected();
-              }
-            }
-          } catch (e) {}
-        }
-      } catch (e) {}
-    }
-
-    function onTVConnected() {
-      if (!isConnectedToTV) {
-        isConnectedToTV = true;
-        micBtn.classList.remove('disabled');
-        if (!isLive) {
-          statusPill.className = 'status-pill connected';
-          statusText.textContent = 'TV Connected';
-          micLabel.textContent = 'Tap to Sing';
-          footerHint.textContent = '🎉 Connected to Samsung TV! Tap the mic button to start singing.';
-        }
-      }
-    }
-
-    // Ping TV every 2 seconds
-    let handshakeAttempts = 0;
-    const handshakeTimer = setInterval(() => {
-      sendToTV({ type: 'PHONE_HELLO', room: roomCode, time: Date.now() });
-      pollTVResponse();
-      handshakeAttempts++;
-
-      if (!isConnectedToTV && handshakeAttempts >= 5) {
-        statusPill.className = 'status-pill error';
-        statusText.textContent = 'TV Offline';
-        micLabel.textContent = 'Code Not Found';
-        footerHint.textContent = `⚠️ Cannot find TV with code "${roomCode}". Make sure the TV is turned on and code matches TV screen!`;
-      }
-    }, 2000);
-
-    // Initial ping
-    sendToTV({ type: 'PHONE_HELLO', room: roomCode, time: Date.now() });
-    pollTVResponse();
-
-    // 3. Microphone Capture & Live State
+    // Microphone Capture & Live State
     micBtn.addEventListener('click', async () => {
       if (!isConnectedToTV) {
-        alert(`Cannot connect to TV with code "${roomCode}". Please check the code on your TV screen!`);
+        alert(`Cannot connect to TV with code "${roomCode}". Please check code on TV screen!`);
         return;
       }
       if (!isLive) {
@@ -459,6 +458,21 @@
 
         sendMicState(true);
         runVUMeter();
+
+        // WebRTC live audio stream to TV
+        try {
+          if (window.Peer) {
+            if (!phonePeer) phonePeer = new Peer();
+            phonePeer.on('open', () => {
+              phonePeer.call('layatv-' + roomCode, stream);
+            });
+            if (phonePeer.id) {
+              phonePeer.call('layatv-' + roomCode, stream);
+            }
+          }
+        } catch (e) {
+          console.warn('WebRTC audio call:', e);
+        }
       } catch (err) {
         alert('Microphone permission required: ' + err.message);
       }
@@ -489,17 +503,6 @@
       const pct = Math.min(100, Math.round((avg / 128) * 100));
       vuFill.style.width = pct + '%';
       animId = requestAnimationFrame(runVUMeter);
-    }
-
-    function sendMicState(active) {
-      sendToTV({
-        type: 'MIC_STATE',
-        active,
-        volume: volSlider.value / 100,
-        echo: echoSlider.value / 100,
-        room: roomCode,
-        time: Date.now()
-      });
     }
   </script>
 </body>

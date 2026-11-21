@@ -14,6 +14,7 @@
       --accent: #1db954;
       --glow: rgba(29, 185, 84, 0.45);
       --green: #4ade80;
+      --yellow: #facc15;
     }
     * {
       box-sizing: border-box;
@@ -52,11 +53,20 @@
       font-size: 12px;
       font-weight: 800;
       padding: 5px 12px;
-      background: rgba(29, 185, 84, 0.18);
+      background: rgba(250, 204, 21, 0.18);
       border-radius: 12px;
-      border: 1px solid var(--accent);
-      color: var(--accent);
+      border: 1px solid var(--yellow);
+      color: var(--yellow);
       cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.3s ease;
+    }
+    .badge.connected {
+      background: rgba(74, 222, 128, 0.18);
+      border-color: var(--green);
+      color: var(--green);
     }
     .import-card {
       width: 100%;
@@ -146,6 +156,13 @@
       line-height: 1.4;
     }
   </style>
+  <script src="js/lib/paho-mqtt.min.js"></script>
+  <script>
+    if (!window.Paho) {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"><\/script>');
+    }
+  </script>
+  <script src="js/providers/remote-bridge.js"></script>
 </head>
 <body>
   <div class="header">
@@ -153,7 +170,7 @@
       <svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:#1db954;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
       <span>Laya Importer</span>
     </div>
-    <div class="badge" id="tv-room-badge" title="Tap to change room code">TV: --</div>
+    <div class="badge" id="tv-room-badge" title="Tap to change room code">TV: Connecting...</div>
   </div>
 
   <div class="import-card">
@@ -173,7 +190,7 @@
 
     <button id="btn-submit-import" class="btn-submit">
       <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:currentColor;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
-      <span>Send to TV</span>
+      <span id="btn-submit-label">Send to TV</span>
     </button>
 
     <div id="result-box" class="result-box">
@@ -191,7 +208,7 @@
 
     const badge = document.getElementById('tv-room-badge');
     if (badge) {
-      badge.textContent = 'TV CODE: ' + roomCode;
+      badge.textContent = 'TV: ' + roomCode;
       badge.addEventListener('click', () => {
         const newCode = prompt('Enter TV Code:', roomCode);
         if (newCode) {
@@ -201,45 +218,58 @@
     }
 
     const submitBtn = document.getElementById('btn-submit-import');
+    const submitLabel = document.getElementById('btn-submit-label');
     const input = document.getElementById('playlist-input');
     const resultBox = document.getElementById('result-box');
 
-    submitBtn.addEventListener('click', async () => {
+    // Initialize Real-time Remote Bridge via WebSockets
+    if (window.RemoteBridge) {
+      window.RemoteBridge.initMobile(roomCode, (data) => {
+        if (data.type === 'TV_ACK') {
+          badge.className = 'badge connected';
+          badge.textContent = '🟢 TV LINKED (' + roomCode + ')';
+        } else if (data.type === 'IMPORT_ACK') {
+          submitBtn.style.background = '#4ade80';
+          submitLabel.textContent = '✅ Sent Successfully!';
+          resultBox.style.display = 'block';
+          input.value = '';
+          setTimeout(() => {
+            submitBtn.style.background = 'linear-gradient(135deg, #1db954 0%, #1ed760 100%)';
+            submitLabel.textContent = 'Send Another Playlist';
+          }, 3000);
+        }
+      });
+    }
+
+    submitBtn.addEventListener('click', () => {
       const val = input.value.trim();
       if (!val) {
         alert('Please paste a playlist link or song names first');
         return;
       }
 
-      submitBtn.textContent = 'Transferring to TV...';
+      submitLabel.textContent = 'Transferring to TV...';
       submitBtn.style.opacity = '0.7';
 
-      try {
-        await fetch(`https://ntfy.sh/layatv_tv_${roomCode}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'PLAYLIST_IMPORT',
-            content: val,
-            room: roomCode,
-            time: Date.now()
-          })
-        });
+      const sent = window.RemoteBridge && window.RemoteBridge.send({
+        type: 'PLAYLIST_IMPORT',
+        content: val,
+        room: roomCode,
+        time: Date.now()
+      });
 
-        submitBtn.textContent = 'Sent Successfully!';
-        submitBtn.style.background = '#4ade80';
-        submitBtn.style.opacity = '1';
-        resultBox.style.display = 'block';
-        input.value = '';
-
+      if (sent) {
         setTimeout(() => {
-          submitBtn.textContent = 'Send Another Playlist';
-          submitBtn.style.background = 'linear-gradient(135deg, #1db954 0%, #1ed760 100%)';
-        }, 3000);
-      } catch (err) {
-        alert('Error sending to TV: ' + err.message);
-        submitBtn.textContent = 'Send to TV';
+          submitBtn.style.opacity = '1';
+          submitBtn.style.background = '#4ade80';
+          submitLabel.textContent = '✅ Sent to TV!';
+          resultBox.style.display = 'block';
+          input.value = '';
+        }, 400);
+      } else {
         submitBtn.style.opacity = '1';
+        submitLabel.textContent = 'Send to TV';
+        alert('Could not reach TV yet. Make sure your Samsung TV is on and on the same room code (' + roomCode + ')!');
       }
     });
   </script>

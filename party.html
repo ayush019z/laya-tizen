@@ -149,6 +149,13 @@
     }
     .toast.show { transform: translateX(-50%) translateY(0); }
   </style>
+  <script src="js/lib/paho-mqtt.min.js"></script>
+  <script>
+    if (!window.Paho) {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"><\/script>');
+    }
+  </script>
+  <script src="js/providers/remote-bridge.js"></script>
 </head>
 <body>
   <div class="ambient-glow"></div>
@@ -182,9 +189,17 @@
       { id: 'party_5', title: 'As It Was', artist: 'Harry Styles', artwork: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=600&auto=format&fit=crop&q=80', durationFormatted: '2:47' }
     ];
 
-    const channel = new BroadcastChannel('laya_party_jukebox');
-    const roomParam = new URLSearchParams(window.location.search).get('room') || 'LAYA-TV';
+    const roomParam = (new URLSearchParams(window.location.search).get('room') || '8842').replace(/^LAYA-/i, '').trim();
     document.getElementById('room-code-tag').textContent = `ROOM: ${roomParam}`;
+
+    if (window.RemoteBridge) {
+      window.RemoteBridge.initMobile(roomParam, (data) => {
+        if (data.type === 'TV_ACK') {
+          document.getElementById('room-code-tag').style.borderColor = '#4ade80';
+          document.getElementById('room-code-tag').style.color = '#4ade80';
+        }
+      });
+    }
 
     function renderList(items) {
       const listEl = document.getElementById('phone-results');
@@ -205,12 +220,10 @@
     }
 
     window.queueTrack = function(track) {
-      // Broadcast to TV
-      channel.postMessage({ type: 'ADD_GUEST_TRACK', track: track, room: roomParam });
-      // Also write to shared localStorage for TV
-      try {
-        localStorage.setItem('laya_guest_incoming_track', JSON.stringify({ track, time: Date.now() }));
-      } catch(e){}
+      // Send directly to TV via WebSocket RemoteBridge
+      if (window.RemoteBridge) {
+        window.RemoteBridge.send({ type: 'ADD_GUEST_TRACK', track: track, room: roomParam });
+      }
 
       showToast(`Added "${track.title}" to TV queue! 🎉`);
     };

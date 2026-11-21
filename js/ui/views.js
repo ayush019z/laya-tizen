@@ -1455,11 +1455,12 @@ class UIViewController {
     modal.classList.add('active');
 
     // Update Room Badge and URL
+    const code = this.getTVRoomCode();
     const tag = document.getElementById('tv-room-code-tag');
-    if (tag) tag.textContent = `ROOM: ${this.roomCode}`;
+    if (tag) tag.textContent = `ROOM: ${code}`;
 
+    const partyUrl = this.getPublicMobileUrl('party.html');
     const urlText = document.getElementById('party-url-text');
-    const partyUrl = `http://layatv.local/party?room=${this.roomCode}`;
     if (urlText) urlText.textContent = partyUrl;
 
     // Generate crisp vector QR Code into target container
@@ -1717,36 +1718,17 @@ class UIViewController {
   }
 
   // =====================================================================
-  // FEATURE 4: REAL-TIME PHONE <-> TV REMOTE BRIDGE (ntfy.sh)
+  // FEATURE 4: REAL-TIME PHONE <-> TV REMOTE BRIDGE (WebSockets / MQTT)
   // =====================================================================
   setupRemoteBridge() {
     const code = this.getTVRoomCode();
-    console.log('[RemoteBridge] Listening for phone commands on room code:', code);
+    console.log('[RemoteBridge] Initializing TV Remote Bridge for room:', code);
 
-    let lastPollTime = Math.floor(Date.now() / 1000) - 2;
-
-    const pollBridge = async () => {
-      try {
-        const resp = await fetch(`https://ntfy.sh/layatv_tv_${code}/json?poll=1&since=${lastPollTime}`);
-        if (!resp.ok) return;
-        const text = await resp.text();
-        if (!text || !text.trim()) return;
-
-        const lines = text.trim().split('\n');
-        for (const line of lines) {
-          try {
-            const entry = JSON.parse(line);
-            if (entry.event === 'message' && entry.message) {
-              if (entry.time) lastPollTime = Math.max(lastPollTime, entry.time);
-              const data = JSON.parse(entry.message);
-              this.handleRemoteMessage(data, code);
-            }
-          } catch (e) {}
-        }
-      } catch (err) {}
-    };
-
-    setInterval(pollBridge, 1500);
+    if (window.RemoteBridge) {
+      window.RemoteBridge.initTV(code, (data) => {
+        this.handleRemoteMessage(data, code);
+      });
+    }
   }
 
   handleRemoteMessage(data, code) {
@@ -1767,19 +1749,17 @@ class UIViewController {
         if (onscreenText) onscreenText.textContent = 'Phone Mic Connected (Live)';
       }
 
-      this.showToast('🎙️ Phone Microphone Connected to TV!');
+      this.showToast('🎙️ Phone Connected to TV!');
 
-      // Send ACK back to phone!
-      fetch(`https://ntfy.sh/layatv_phone_${code}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      // Send ACK back to phone via WebSocket!
+      if (window.RemoteBridge) {
+        window.RemoteBridge.send({
           type: 'TV_ACK',
           room: code,
           status: 'CONNECTED',
           time: Date.now()
-        })
-      }).catch(() => {});
+        });
+      }
     } else if (data.type === 'MIC_STATE') {
       const statusPill = document.getElementById('mic-connection-status');
       const statusText = document.getElementById('mic-status-text');
@@ -1820,6 +1800,27 @@ class UIViewController {
         const input = document.getElementById('import-url-input');
         if (input) input.value = data.content;
         this.executePlaylistImport();
+
+        if (window.RemoteBridge) {
+          window.RemoteBridge.send({
+            type: 'IMPORT_ACK',
+            status: 'IMPORTING',
+            room: code,
+            time: Date.now()
+          });
+        }
+      }
+    } else if (data.type === 'ADD_GUEST_TRACK') {
+      if (data.track) {
+        this.handleGuestSongArrival(data.track);
+        if (window.RemoteBridge) {
+          window.RemoteBridge.send({
+            type: 'QUEUE_ACK',
+            status: 'QUEUED',
+            room: code,
+            time: Date.now()
+          });
+        }
       }
     }
   }
