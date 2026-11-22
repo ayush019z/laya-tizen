@@ -492,6 +492,170 @@ class MusicProvider {
   }
 
   /**
+   * Search for verified Artists (JioSaavn Artist Directory)
+   */
+  async searchArtist(query) {
+    if (!query || query.trim().length < 2) return null;
+    const cleanQuery = query.trim().toLowerCase();
+
+    try {
+      const saavnUrl = `https://www.jiosaavn.com/api.php?__call=search.getArtistResults&_format=json&_marker=0&api_version=4&ctx=web6dot0&n=5&p=1&q=${encodeURIComponent(query.trim())}`;
+      const res = await fetch(saavnUrl, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(4000) });
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (!data || !data.results || data.results.length === 0) return null;
+
+      // Find the best match
+      const artist = data.results.find(a => {
+        const name = (a.name || '').toLowerCase();
+        return name === cleanQuery || name.includes(cleanQuery) || cleanQuery.includes(name);
+      }) || data.results[0];
+
+      if (!artist || !artist.id) return null;
+
+      const rawImg = artist.image || '';
+      const artwork = (window.getHighQualityArtwork ? window.getHighQualityArtwork(rawImg) : rawImg.replace(/150x150|50x50/, '500x500')) || 'assets/icon.png';
+      const cleanName = (artist.name || query)
+        .replace(/&quot;/g, '"')
+        .replace(/&#039;/g, "'")
+        .replace(/&amp;/g, '&');
+
+      return {
+        id: artist.id,
+        name: cleanName,
+        role: artist.role || 'Artist',
+        follower_count: artist.follower_count || '',
+        artwork,
+        isVerified: true
+      };
+    } catch (err) {
+      console.warn('[MusicProvider] searchArtist error:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Fetch complete artist discography (50-100+ songs, top hits, dedicated playlists)
+   */
+  async getArtistDiscography(artistId, artistName) {
+    console.log(`[MusicProvider] Fetching complete discography for: "${artistName}" (ID: ${artistId})`);
+    const allRaw = [];
+    let artistBio = '';
+    let artistFollowers = '';
+    let artistImage = '';
+
+    try {
+      // 1. Fetch official artist page details & top songs
+      const pageUrl = `https://www.jiosaavn.com/api.php?__call=artist.getArtistPageDetails&_format=json&_marker=0&api_version=4&ctx=web6dot0&artistId=${artistId}&n_song=50`;
+      const pageRes = await fetch(pageUrl, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(6000) });
+      let pageData = null;
+      if (pageRes.ok) {
+        pageData = await pageRes.json();
+        if (pageData) {
+          artistBio = pageData.bio || '';
+          artistFollowers = pageData.follower_count || '';
+          artistImage = pageData.image || '';
+          if (pageData.topSongs && Array.isArray(pageData.topSongs)) {
+            allRaw.push(...pageData.topSongs);
+          }
+        }
+      }
+
+      // 2. Fetch top dedicated artist playlists (e.g. Let's Play, Best of Romance, Hits)
+      const dedicatedLists = (pageData?.dedicated_artist_playlist || []).slice(0, 2);
+      if (dedicatedLists.length > 0) {
+        const plPromises = dedicatedLists.map(pl =>
+          fetch(`https://www.jiosaavn.com/api.php?__call=playlist.getDetails&_format=json&_marker=0&api_version=4&ctx=web6dot0&listid=${pl.id}`, {
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+            signal: AbortSignal.timeout(5000)
+          })
+            .then(r => r.json())
+            .then(d => d.songs || d.list || [])
+            .catch(() => [])
+        );
+        const plResults = await Promise.all(plPromises);
+        plResults.forEach(songs => {
+          if (Array.isArray(songs)) allRaw.push(...songs);
+        });
+      }
+
+      // 3. Search hits to catch any missing blockbusters
+      try {
+        const hitsUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&api_version=4&ctx=web6dot0&n=40&p=1&q=${encodeURIComponent(artistName)}`;
+        const hitsRes = await fetch(hitsUrl, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(4000) });
+        if (hitsRes.ok) {
+          const hitsData = await hitsRes.json();
+          if (hitsData && hitsData.results && Array.isArray(hitsData.results)) {
+            allRaw.push(...hitsData.results);
+          }
+        }
+      } catch (e) {
+        console.warn('[MusicProvider] search hits in discography failed:', e);
+      }
+    } catch (err) {
+      console.warn('[MusicProvider] getArtistDiscography failed:', err);
+    }
+
+    // Deduplicate and process into valid track objects
+    const seen = new Set();
+    const tracks = [];
+
+    allRaw.forEach(s => {
+      if (!s || !s.title || !s.more_info?.encrypted_media_url) return;
+      const cleanTitle = (s.title || 'Unknown Title')
+        .replace(/&quot;/g, '"')
+        .replace(/&#039;/g, "'")
+        .replace(/&amp;/g, '&');
+
+      // Normalize title to filter out duplicates in compilation albums
+      const norm = cleanTitle.toLowerCase().replace(/[\(\[\{].*?[\)\]\}]/g, '').replace(/[^a-z0-9]/g, '').trim();
+      if (seen.has(norm)) return;
+      seen.add(norm);
+
+      const stream = this.decryptMediaUrl(s.more_info?.encrypted_media_url);
+      const dur = parseInt(s.more_info?.duration || '240', 10);
+      const mins = Math.floor(dur / 60);
+      const secs = String(dur % 60).padStart(2, '0');
+      const rawImage = s.image || '';
+      const artwork = (window.getHighQualityArtwork ? window.getHighQualityArtwork(rawImage) : rawImage.replace(/150x150|50x50/, '500x500')) || 'assets/icon.png';
+      const cleanArtist = (s.more_info?.singers || s.subtitle || artistName)
+        .replace(/&quot;/g, '"')
+        .replace(/&#039;/g, "'")
+        .replace(/&amp;/g, '&');
+      const cleanAlbum = (s.more_info?.album || 'Single')
+        .replace(/&quot;/g, '"')
+        .replace(/&#039;/g, "'")
+        .replace(/&amp;/g, '&');
+
+      tracks.push({
+        id: 'saavn_' + s.id,
+        source: 'JioSaavn',
+        title: cleanTitle,
+        artist: cleanArtist,
+        album: cleanAlbum,
+        duration: dur,
+        durationFormatted: `${mins}:${secs}`,
+        artwork,
+        streamUrl: stream,
+        encrypted_media_url: s.more_info?.encrypted_media_url
+      });
+    });
+
+    const finalArtwork = (window.getHighQualityArtwork ? window.getHighQualityArtwork(artistImage) : artistImage.replace(/150x150|50x50/, '500x500')) || (tracks[0]?.artwork || 'assets/icon.png');
+
+    return {
+      artist: {
+        id: artistId,
+        name: artistName,
+        bio: artistBio,
+        follower_count: artistFollowers,
+        artwork: finalArtwork
+      },
+      tracks
+    };
+  }
+
+  /**
    * Resolve Playable Stream URL for Track (Full-length & Ad-free)
    */
   async resolveTrackStream(track) {

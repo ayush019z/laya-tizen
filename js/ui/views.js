@@ -120,7 +120,9 @@ class UIViewController {
     } else if (viewName === 'library') {
       this.renderLibrary();
     } else if (viewName === 'playlist') {
-      if (this.currentPlaylistId && window.Library) {
+      if (this.currentPlaylistData) {
+        this.renderPlaylistDetails(this.currentPlaylistData);
+      } else if (this.currentPlaylistId && window.Library) {
         const pl = window.Library.getPlaylist(this.currentPlaylistId);
         if (pl) this.renderPlaylistDetails(pl);
       }
@@ -463,50 +465,89 @@ class UIViewController {
       resultsContainer.innerHTML = `<div style="color: var(--text-sub); font-size: 18px; padding: 24px; text-align: center;">Searching for "${query}"...</div>`;
     }
 
-    const results = await window.MusicProvider.search(query);
+    const [results, artistMatch] = await Promise.all([
+      window.MusicProvider.search(query),
+      window.MusicProvider.searchArtist(query)
+    ]);
     resultsContainer.innerHTML = '';
 
-    if (!results || results.length === 0) {
+    if ((!results || results.length === 0) && !artistMatch) {
       resultsContainer.innerHTML = `<div style="color: var(--text-dim); font-size: 18px; padding: 30px; text-align: center;">No tracks found for "${query}". Try another title or artist.</div>`;
       return;
     }
 
-    const titleHeader = document.createElement('div');
-    titleHeader.style.cssText = 'font-size: 16px; font-weight: 700; color: var(--text-dim); margin-bottom: 14px; text-transform: uppercase; letter-spacing: 1px;';
-    titleHeader.textContent = `Search Results (${results.length})`;
-    resultsContainer.appendChild(titleHeader);
-
-    results.forEach(track => {
-      const row = document.createElement('div');
-      row.className = 'recognized-track-row focusable';
-      row.setAttribute('tabindex', '0');
-      row.innerHTML = `
-        <div class="recognized-artwork">
-          <img src="${window.getHighQualityArtwork ? window.getHighQualityArtwork(track.artwork) : track.artwork}" alt="${track.title}" loading="lazy"/>
+    // 1. Render Artist Spotlight Banner if verified artist match found
+    if (artistMatch) {
+      const artistCard = document.createElement('div');
+      artistCard.className = 'artist-spotlight-card focusable';
+      artistCard.setAttribute('tabindex', '0');
+      artistCard.setAttribute('data-focus-name', `Artist: ${artistMatch.name}`);
+      const followersText = artistMatch.follower_count ? `${parseInt(artistMatch.follower_count, 10).toLocaleString()} Monthly Listeners • ` : '';
+      artistCard.innerHTML = `
+        <div class="artist-spotlight-avatar-wrap">
+          <img class="artist-spotlight-avatar" src="${artistMatch.artwork}" alt="${artistMatch.name}" loading="lazy"/>
+          <div class="artist-verified-pill" title="Verified Artist">✓</div>
         </div>
-        <div class="recognized-info">
-          <div class="recognized-track-title">${track.title}</div>
-          <div class="recognized-track-sub">${track.artist} · ${track.album || ''}</div>
+        <div class="artist-spotlight-meta">
+          <div class="artist-spotlight-label">VERIFIED ARTIST</div>
+          <div class="artist-spotlight-name">${artistMatch.name}</div>
+          <div class="artist-spotlight-sub">${followersText}Official Complete Discography & Top Hits</div>
         </div>
-        <div style="font-size: 14px; color: var(--text-dim); font-variant-numeric: tabular-nums;">${track.durationFormatted || '3:20'}</div>
+        <div class="artist-spotlight-action">
+          <button class="btn-open-discography" tabindex="-1">
+            <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; fill: currentColor;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+            <span>Open Total Musics</span>
+          </button>
+        </div>
       `;
 
-      row.addEventListener('click', () => {
-        window.Queue.setQueue(results, results.indexOf(track));
-        window.AudioPlayer.playTrack(track);
-        this.openFullscreenPlayer();
+      artistCard.addEventListener('click', () => {
+        this.openArtistDiscography(artistMatch.id, artistMatch.name, artistMatch.artwork);
       });
 
-      resultsContainer.appendChild(row);
-    });
+      resultsContainer.appendChild(artistCard);
+    }
 
-    // Auto-focus the first search result ONLY when explicitly requested (e.g. clicked SEARCH button)
+    // 2. Render Track Search Results
+    if (results && results.length > 0) {
+      const titleHeader = document.createElement('div');
+      titleHeader.style.cssText = 'font-size: 16px; font-weight: 700; color: var(--text-dim); margin: 18px 0 14px 0; text-transform: uppercase; letter-spacing: 1px;';
+      titleHeader.textContent = `Songs & Tracks (${results.length})`;
+      resultsContainer.appendChild(titleHeader);
+
+      results.forEach(track => {
+        const row = document.createElement('div');
+        row.className = 'recognized-track-row focusable';
+        row.setAttribute('tabindex', '0');
+        row.setAttribute('data-focus-name', `${track.title} - ${track.artist}`);
+        row.innerHTML = `
+          <div class="recognized-artwork">
+            <img src="${window.getHighQualityArtwork ? window.getHighQualityArtwork(track.artwork) : track.artwork}" alt="${track.title}" loading="lazy"/>
+          </div>
+          <div class="recognized-info">
+            <div class="recognized-track-title">${track.title}</div>
+            <div class="recognized-track-sub">${track.artist} · ${track.album || ''}</div>
+          </div>
+          <div style="font-size: 14px; color: var(--text-dim); font-variant-numeric: tabular-nums;">${track.durationFormatted || '3:20'}</div>
+        `;
+
+        row.addEventListener('click', () => {
+          window.Queue.setQueue(results, results.indexOf(track));
+          window.AudioPlayer.playTrack(track);
+          this.openFullscreenPlayer();
+        });
+
+        resultsContainer.appendChild(row);
+      });
+    }
+
+    // Auto-focus the artist spotlight card (or first track row) ONLY when explicitly requested (e.g. clicked SEARCH button)
     // When live-typing, keep focus on the keyboard so typing is uninterrupted
     if (autoFocusFirst) {
       setTimeout(() => {
-        const firstRow = resultsContainer.querySelector('.recognized-track-row');
-        if (firstRow && window.SpatialNav) {
-          window.SpatialNav.setFocus(firstRow);
+        const firstFocus = resultsContainer.querySelector('.artist-spotlight-card') || resultsContainer.querySelector('.recognized-track-row');
+        if (firstFocus && window.SpatialNav) {
+          window.SpatialNav.setFocus(firstFocus);
         }
       }, 100);
     }
@@ -617,8 +658,48 @@ class UIViewController {
       return;
     }
     this.currentPlaylistId = playlistId;
+    this.currentPlaylistData = pl;
+    this.discographyPrevView = 'library';
     this.renderPlaylistDetails(pl);
     this.switchView('playlist');
+  }
+
+  /**
+   * Open Complete Artist Discography / Total Musics
+   */
+  async openArtistDiscography(artistId, artistName, artistImage) {
+    this.ensureDynamicDOM();
+    this.discographyPrevView = this.currentView || 'search';
+    this.showToast(`Loading total musics for ${artistName}...`);
+
+    try {
+      const discography = await window.MusicProvider.getArtistDiscography(artistId, artistName);
+      if (!discography || !discography.tracks || discography.tracks.length === 0) {
+        this.showToast(`No tracks found for ${artistName}`);
+        return;
+      }
+
+      this.currentPlaylistData = {
+        id: 'artist_' + artistId,
+        isArtistDiscography: true,
+        artistId: artistId,
+        title: `${artistName} · Total Musics`,
+        name: `${artistName} · Total Musics`,
+        artist: artistName,
+        source: 'Official Discography',
+        artwork: discography.artist?.artwork || artistImage,
+        tracks: discography.tracks,
+        createdAt: Date.now()
+      };
+
+      this.currentPlaylistId = this.currentPlaylistData.id;
+      this.renderPlaylistDetails(this.currentPlaylistData);
+      this.switchView('playlist');
+      this.showToast(`Loaded ${discography.tracks.length} songs for ${artistName}`);
+    } catch (e) {
+      console.error('[Views] openArtistDiscography error:', e);
+      this.showToast(`Failed to load discography for ${artistName}`);
+    }
   }
 
   renderPlaylistDetails(pl) {
@@ -636,11 +717,12 @@ class UIViewController {
       }
     }
 
+    const isDiscography = !!pl.isArtistDiscography;
     const tracks = pl.tracks || [];
     const title = pl.title || pl.name || 'Untitled Playlist';
     const rawArt = pl.artwork || (tracks[0] ? tracks[0].artwork : 'assets/icon.png');
     const artwork = window.getHighQualityArtwork ? window.getHighQualityArtwork(rawArt) : rawArt;
-    const source = (pl.source || pl.sourceUrl) ? ((pl.sourceUrl && pl.sourceUrl.includes('apple')) ? 'Apple Music' : (pl.sourceUrl && pl.sourceUrl.includes('spotify')) ? 'Spotify' : 'Imported') : 'Custom Mix';
+    const source = isDiscography ? 'Verified Discography' : ((pl.source || pl.sourceUrl) ? ((pl.sourceUrl && pl.sourceUrl.includes('apple')) ? 'Apple Music' : (pl.sourceUrl && pl.sourceUrl.includes('spotify')) ? 'Spotify' : 'Imported') : 'Custom Mix');
 
     let totalSecs = 0;
     tracks.forEach(t => {
@@ -654,27 +736,28 @@ class UIViewController {
     const hours = Math.floor(totalSecs / 3600);
     const mins = Math.floor((totalSecs % 3600) / 60);
     const durationStr = hours > 0 ? `${hours} hr ${mins} min` : `${mins} min`;
+    const backLabel = isDiscography ? (this.discographyPrevView === 'search' ? '← Back to Search' : '← Back') : '← Back to Library';
 
     let html = `
       <div class="playlist-header">
-        <button id="btn-pl-back" class="pl-back-btn focusable" tabindex="0" data-focus-name="Back to Library">
+        <button id="btn-pl-back" class="pl-back-btn focusable" tabindex="0" data-focus-name="${backLabel}">
           <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; fill: currentColor;"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
-          <span>← Back to Library</span>
+          <span>${backLabel}</span>
         </button>
 
-        <div class="playlist-hero-card">
-          <div class="playlist-hero-art">
+        <div class="playlist-hero-card ${isDiscography ? 'artist-discography-hero' : ''}">
+          <div class="playlist-hero-art ${isDiscography ? 'artist-hero-art' : ''}">
             <img src="${artwork}" alt="${title}"/>
           </div>
           <div class="playlist-hero-info">
-            <div class="playlist-hero-badge">PLAYLIST • ${source}</div>
+            <div class="playlist-hero-badge">${isDiscography ? 'ARTIST • TOTAL MUSICS (DISCOGRAPHY)' : `PLAYLIST • ${source}`}</div>
             <h1 class="playlist-hero-title">${title}</h1>
             <div class="playlist-hero-meta">
               <span>${tracks.length} songs</span>
               <span class="meta-dot">•</span>
               <span>${durationStr}</span>
               <span class="meta-dot">•</span>
-              <span>${window.Library.getRelativeTime(pl.createdAt)}</span>
+              <span>${isDiscography ? 'Complete Official Catalog' : window.Library.getRelativeTime(pl.createdAt)}</span>
             </div>
 
             <div class="playlist-action-bar">
@@ -686,10 +769,11 @@ class UIViewController {
                 <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; fill: currentColor;"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
                 <span>Shuffle</span>
               </button>
+              ${!isDiscography ? `
               <button id="btn-pl-delete" class="pl-btn-danger focusable" tabindex="0" data-focus-name="Delete Playlist">
                 <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; fill: currentColor;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
                 <span>Delete Playlist</span>
-              </button>
+              </button>` : ''}
             </div>
           </div>
         </div>
@@ -699,8 +783,9 @@ class UIViewController {
         <div class="pl-track-list-header">
           <span style="width: 44px; text-align: center;">#</span>
           <span style="flex: 1;">TITLE & ARTIST</span>
+          ${isDiscography ? '<span class="pl-discography-album-head" style="width: 240px; text-align: left;">ALBUM / MOVIE</span>' : ''}
           <span style="width: 120px; text-align: right;">DURATION</span>
-          <span style="width: 90px; text-align: center;">REMOVE</span>
+          ${!isDiscography ? '<span style="width: 90px; text-align: center;">REMOVE</span>' : ''}
         </div>
 
         <div class="pl-track-list" id="pl-track-list-body">
@@ -719,10 +804,12 @@ class UIViewController {
               <div class="pl-track-title">${t.title}</div>
               <div class="pl-track-artist">${t.artist || 'Unknown Artist'}</div>
             </div>
+            ${isDiscography ? `<div class="pl-discography-album">${t.album || 'Single'}</div>` : ''}
             <div class="pl-track-duration">${t.durationFormatted || '3:30'}</div>
+            ${!isDiscography ? `
             <button class="pl-btn-remove focusable" tabindex="0" data-remove-index="${idx}" title="Remove song from playlist" data-focus-name="Remove ${t.title}">
               <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: currentColor;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-            </button>
+            </button>` : ''}
           </div>
         `;
       });
@@ -741,7 +828,8 @@ class UIViewController {
     const backBtn = container.querySelector('#btn-pl-back');
     if (backBtn) {
       backBtn.addEventListener('click', () => {
-        this.switchView('library');
+        const dest = (isDiscography && this.discographyPrevView) ? this.discographyPrevView : 'library';
+        this.switchView(dest);
       });
     }
 
@@ -792,19 +880,21 @@ class UIViewController {
       });
     });
 
-    // Remove individual track from playlist
-    container.querySelectorAll('.pl-btn-remove').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const idx = parseInt(btn.getAttribute('data-remove-index'), 10);
-        if (!isNaN(idx)) {
-          const updated = window.Library.removeTrackFromPlaylist(pl.id, idx);
-          if (updated) {
-            this.renderPlaylistDetails(updated);
+    // Remove individual track from playlist (only for custom imported playlists)
+    if (!isDiscography) {
+      container.querySelectorAll('.pl-btn-remove').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const idx = parseInt(btn.getAttribute('data-remove-index'), 10);
+          if (!isNaN(idx) && window.Library) {
+            const updated = window.Library.removeTrackFromPlaylist(pl.id, idx);
+            if (updated) {
+              this.renderPlaylistDetails(updated);
+            }
           }
-        }
+        });
       });
-    });
+    }
   }
 
   // --- 5. Mini Player & Fullscreen ---

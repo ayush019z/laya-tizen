@@ -291,9 +291,10 @@ class RemoteKeyController {
       return;
     }
 
-    // 2. If inside playlist view, return to Library
+    // 2. If inside playlist view, return to Library or Search (if viewing Artist Discography)
     if (window.UIController && window.UIController.currentView === 'playlist') {
-      window.UIController.switchView('library');
+      const prev = window.UIController.discographyPrevView || 'library';
+      window.UIController.switchView(prev);
       return;
     }
 

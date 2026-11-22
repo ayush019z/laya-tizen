@@ -1,11 +1,11 @@
 {
-  "version": "1.4.4",
-  "build": 193,
+  "version": "1.4.5",
+  "build": 194,
   "releaseDate": "2026-11-22",
   "minTizenVersion": "3.0",
   "updateUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/version.json",
   "bundleBaseUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/",
-  "changelog": "Low-latency audio optimization (interactive latencyHint, zero-latency software mic buffers), spatial navigation reflow throttling, GPU hardware acceleration on D-pad navigation.",
+  "changelog": "Artist Discography & Total Musics search support (e.g. search Arijit Singh to open and play complete 50-70+ hit catalog, official discography banner, verified artist spotlight, and seamless remote D-pad playback).",
   "files": [
     "index.html",
     "mic.html",
