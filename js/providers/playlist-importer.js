@@ -124,7 +124,7 @@ class PlaylistImporter {
               rawTrackList.push({
                 title: s.name,
                 artist: s.primaryArtists || s.singers || '',
-                artwork: s.image && s.image[2] ? s.image[2].link : ''
+                artwork: window.getHighQualityArtwork ? window.getHighQualityArtwork(s.image && s.image[2] ? s.image[2].link : (s.image || '')) : (s.image && s.image[2] ? s.image[2].link : '')
               });
             });
           }
@@ -181,7 +181,7 @@ class PlaylistImporter {
                 rawTrackList.push({
                   title: item.trackName,
                   artist: item.artistName || '',
-                  artwork: item.artworkUrl100 || item.artworkUrl60 || ''
+                  artwork: window.getHighQualityArtwork ? window.getHighQualityArtwork(item.artworkUrl100 || item.artworkUrl60 || '') : (item.artworkUrl100 || item.artworkUrl60 || '')
                 });
               }
             });
@@ -436,26 +436,31 @@ class PlaylistImporter {
 
         if (matchedTrack) {
           if (item.artwork && !matchedTrack.artwork) matchedTrack.artwork = item.artwork;
+          if (matchedTrack.artwork && window.getHighQualityArtwork) {
+            matchedTrack.artwork = window.getHighQualityArtwork(matchedTrack.artwork);
+          }
           resolvedTracks.push(matchedTrack);
         } else {
           // Never substitute an unrelated song! Store accurate track object
+          const finalArt = (item.artwork && window.getHighQualityArtwork) ? window.getHighQualityArtwork(item.artwork) : (item.artwork || 'assets/icon.png');
           resolvedTracks.push({
             id: 'imp_' + Math.random().toString(36).substring(2, 9),
             title: item.title,
             artist: item.artist || 'Unknown Artist',
             album: playlistName,
-            artwork: item.artwork || 'assets/icon.png',
+            artwork: finalArt,
             durationFormatted: '3:30',
             streamUrl: null
           });
         }
       } catch (err) {
+        const finalArt = (item.artwork && window.getHighQualityArtwork) ? window.getHighQualityArtwork(item.artwork) : (item.artwork || 'assets/icon.png');
         resolvedTracks.push({
           id: 'imp_' + Math.random().toString(36).substring(2, 9),
           title: item.title,
           artist: item.artist || 'Unknown Artist',
           album: playlistName,
-          artwork: item.artwork || 'assets/icon.png',
+          artwork: finalArt,
           durationFormatted: '3:30',
           streamUrl: null
         });

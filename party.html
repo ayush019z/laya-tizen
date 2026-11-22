@@ -405,7 +405,7 @@
               id: `itunes_${item.trackId}`,
               title: item.trackName,
               artist: item.artistName,
-              artwork: item.artworkUrl100 ? item.artworkUrl100.replace('100x100bb', '600x600bb') : 'assets/icon.png',
+              artwork: item.artworkUrl100 ? item.artworkUrl100.replace('100x100bb', '800x800bb') : 'assets/icon.png',
               durationFormatted: formatMillis(item.trackTimeMillis)
             }));
             renderList(mapped, true);

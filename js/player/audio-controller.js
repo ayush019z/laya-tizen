@@ -1,6 +1,48 @@
 /**
  * Laya TV - High Fidelity Audio Controller & Stream Engine
  */
+window.getHighQualityArtwork = function(url) {
+  if (!url || typeof url !== 'string') return 'assets/icon.png';
+  if (url.indexOf('assets/') !== -1) return url;
+
+  // 1. Apple Music / iTunes (mzstatic.com): 60x60 / 100x100 -> 800x800
+  if (url.indexOf('mzstatic.com') !== -1 || url.indexOf('apple.com') !== -1) {
+    return url.replace(/\d+x\d+bb\.(?:jpg|png|webp)/gi, '800x800bb.jpg')
+              .replace(/\d+x\d+bb/gi, '800x800bb')
+              .replace(/\d+x\d+\.(?:jpg|png|webp)/gi, '800x800.jpg');
+  }
+
+  // 2. JioSaavn / Saavn CDN: 50x50 / 150x150 / 250x250 -> 500x500
+  if (url.indexOf('saavncdn.com') !== -1) {
+    return url.replace(/-(?:50x50|150x150|250x250)\.(?:jpg|jpeg|png)/gi, '-500x500.jpg')
+              .replace(/(?:50x50|150x150|250x250)/gi, '500x500');
+  }
+
+  // 3. YouTube Music / Google User Content (lh3.googleusercontent.com)
+  if (url.indexOf('googleusercontent.com') !== -1 || url.indexOf('ggpht.com') !== -1) {
+    return url.replace(/=w\d+-h\d+[^"]*/gi, '=w800-h800-l90-rj')
+              .replace(/=s\d+[^"]*/gi, '=s800');
+  }
+
+  // 4. YouTube Video Thumbnails: /default.jpg /mqdefault.jpg -> /hqdefault.jpg
+  if (url.indexOf('ytimg.com') !== -1) {
+    return url.replace(/\/(?:default|mqdefault)\.jpg/gi, '/hqdefault.jpg');
+  }
+
+  // 5. Spotify CDN: 64x64 (00004851) & 300x300 (00001e02) -> 640x640 (0000b273)
+  if (url.indexOf('scdn.co/image/') !== -1) {
+    return url.replace(/ab67616d00004851/gi, 'ab67616d0000b273')
+              .replace(/ab67616d00001e02/gi, 'ab67616d0000b273');
+  }
+
+  // 6. Unsplash: w=100 -> w=800
+  if (url.indexOf('images.unsplash.com') !== -1) {
+    return url.replace(/w=\d+/gi, 'w=800');
+  }
+
+  return url;
+};
+
 class AudioController {
   constructor() {
     this.audio = new Audio();
@@ -46,6 +88,9 @@ class AudioController {
 
   async playTrack(track, fromQueue = false) {
     if (!track) return;
+    if (track.artwork && window.getHighQualityArtwork) {
+      track.artwork = window.getHighQualityArtwork(track.artwork);
+    }
     this.currentTrack = track;
 
     // 1. Dynamic Artwork Palette Extraction (Material 3 Themepack)
@@ -243,7 +288,8 @@ class AudioController {
 
   updateMetadataUI(track) {
     if (!track) return;
-    const artworkUrl = track.artwork || 'assets/icon.png';
+    const rawArtwork = track.artwork || 'assets/icon.png';
+    const artworkUrl = window.getHighQualityArtwork ? window.getHighQualityArtwork(rawArtwork) : rawArtwork;
     const titleText = track.title || 'Unknown Title';
     const artistText = track.artist || 'Unknown Artist';
 

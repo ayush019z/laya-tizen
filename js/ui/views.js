@@ -220,7 +220,7 @@ class UIViewController {
 
           card.innerHTML = `
             <div class="media-card-artwork">
-              <img src="${track.artwork}" alt="${track.title}" loading="lazy"/>
+              <img src="${window.getHighQualityArtwork ? window.getHighQualityArtwork(track.artwork) : track.artwork}" alt="${track.title}" loading="lazy"/>
             </div>
             <div class="media-card-title">${track.title}</div>
             <div class="media-card-author">${track.artist}</div>
@@ -285,7 +285,7 @@ class UIViewController {
 
       row.innerHTML = `
         <div class="recognized-artwork">
-          <img src="${track.artwork}" alt="${track.title}" loading="lazy"/>
+          <img src="${window.getHighQualityArtwork ? window.getHighQualityArtwork(track.artwork) : track.artwork}" alt="${track.title}" loading="lazy"/>
         </div>
         <div class="recognized-info">
           <div class="recognized-track-title">${track.title}</div>
@@ -482,7 +482,7 @@ class UIViewController {
       row.setAttribute('tabindex', '0');
       row.innerHTML = `
         <div class="recognized-artwork">
-          <img src="${track.artwork}" alt="${track.title}" loading="lazy"/>
+          <img src="${window.getHighQualityArtwork ? window.getHighQualityArtwork(track.artwork) : track.artwork}" alt="${track.title}" loading="lazy"/>
         </div>
         <div class="recognized-info">
           <div class="recognized-track-title">${track.title}</div>
@@ -539,7 +539,7 @@ class UIViewController {
       favorites.forEach(t => {
         html += `
           <div class="recognized-track-row focusable" tabindex="0" data-id="${t.id}">
-            <div class="recognized-artwork"><img src="${t.artwork}"/></div>
+            <div class="recognized-artwork"><img src="${window.getHighQualityArtwork ? window.getHighQualityArtwork(t.artwork) : t.artwork}"/></div>
             <div class="recognized-info"><div class="recognized-track-title">${t.title}</div><div class="recognized-track-sub">${t.artist}</div></div>
             <div style="font-size: 14px; color: var(--text-dim);">${t.durationFormatted || '3:00'}</div>
           </div>
@@ -638,7 +638,8 @@ class UIViewController {
 
     const tracks = pl.tracks || [];
     const title = pl.title || pl.name || 'Untitled Playlist';
-    const artwork = pl.artwork || (tracks[0] ? tracks[0].artwork : 'assets/icon.png');
+    const rawArt = pl.artwork || (tracks[0] ? tracks[0].artwork : 'assets/icon.png');
+    const artwork = window.getHighQualityArtwork ? window.getHighQualityArtwork(rawArt) : rawArt;
     const source = (pl.source || pl.sourceUrl) ? ((pl.sourceUrl && pl.sourceUrl.includes('apple')) ? 'Apple Music' : (pl.sourceUrl && pl.sourceUrl.includes('spotify')) ? 'Spotify' : 'Imported') : 'Custom Mix';
 
     let totalSecs = 0;
@@ -712,7 +713,7 @@ class UIViewController {
           <div class="pl-track-row focusable" tabindex="0" data-track-index="${idx}" data-focus-name="${t.title}">
             <div class="pl-track-idx">${num}</div>
             <div class="pl-track-thumb">
-              <img src="${t.artwork || 'assets/icon.png'}" alt=""/>
+              <img src="${window.getHighQualityArtwork ? window.getHighQualityArtwork(t.artwork || 'assets/icon.png') : (t.artwork || 'assets/icon.png')}" alt=""/>
             </div>
             <div class="pl-track-meta">
               <div class="pl-track-title">${t.title}</div>
@@ -1019,7 +1020,7 @@ class UIViewController {
       row.className = `recognized-track-row focusable ${idx === currentIdx ? 'active' : ''}`;
       row.setAttribute('tabindex', '0');
       row.innerHTML = `
-        <div class="recognized-artwork"><img src="${t.artwork}"/></div>
+        <div class="recognized-artwork"><img src="${window.getHighQualityArtwork ? window.getHighQualityArtwork(t.artwork) : t.artwork}"/></div>
         <div class="recognized-info">
           <div class="recognized-track-title">${idx === currentIdx ? '▶ ' : ''}${t.title}</div>
           <div class="recognized-track-sub">${t.artist}</div>

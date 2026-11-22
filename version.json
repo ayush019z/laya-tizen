@@ -1,6 +1,6 @@
 {
-  "version": "1.4.3",
-  "build": 192,
+  "version": "1.4.4",
+  "build": 193,
   "releaseDate": "2026-11-22",
   "minTizenVersion": "3.0",
   "updateUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/version.json",

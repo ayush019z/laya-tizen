@@ -338,7 +338,7 @@ class MusicProvider {
           id: videoId,
           title: titleText,
           artist: artistText,
-          artwork: thumbUrl || 'assets/icon.png',
+          artwork: (window.getHighQualityArtwork ? window.getHighQualityArtwork(thumbUrl) : thumbUrl) || 'assets/icon.png',
           duration: 210,
           durationFormatted: '3:30'
         });
@@ -377,7 +377,8 @@ class MusicProvider {
             const dur = parseInt(s.more_info?.duration || '240');
             const mins = Math.floor(dur / 60);
             const secs = String(dur % 60).padStart(2, '0');
-            const artwork = (s.image || '').replace('150x150', '500x500') || 'assets/icon.png';
+            const rawImage = s.image || '';
+            const artwork = (window.getHighQualityArtwork ? window.getHighQualityArtwork(rawImage) : rawImage.replace('150x150', '500x500')) || 'assets/icon.png';
             const title = (s.title || 'Unknown Title')
               .replace(/&quot;/g, '"')
               .replace(/&#039;/g, "'")
@@ -451,7 +452,8 @@ class MusicProvider {
             const title = flex[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.[0]?.text;
             const runs2 = flex[1]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs || [];
             const artist = runs2.map(x => x.text).filter(t => t !== ' • ' && t !== 'Song' && !t.includes(':')).join(', ') || 'YouTube Music';
-            const thumb = r.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails?.slice(-1)[0]?.url;
+            const rawThumb = r.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails?.slice(-1)[0]?.url;
+            const thumb = (window.getHighQualityArtwork ? window.getHighQualityArtwork(rawThumb) : rawThumb) || 'assets/icon.png';
 
             if (title && !seenTitles.has(title.toLowerCase())) {
               seenTitles.add(title.toLowerCase());
