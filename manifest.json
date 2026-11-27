@@ -1,0 +1,19 @@
+{
+  "name": "Laya - High-Fidelity Music",
+  "short_name": "Laya",
+  "description": "High-fidelity music streaming with ultra-premium frosted glass UI and live synced lyrics.",
+  "start_url": "./mobile.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#080711",
+  "theme_color": "#080711",
+  "icons": [
+    {
+      "src": "assets/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -10,7 +10,16 @@
   
   <link rel="icon" type="image/png" href="assets/icon.png">
   <link rel="apple-touch-icon" href="assets/icon.png">
+  <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="css/mobile.css">
+  
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
+  </script>
 </head>
 <body>
   <!-- Dynamic Ambient Mesh Canvas (GPU-accelerated background adapting to album colors) -->
