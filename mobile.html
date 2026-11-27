@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#080711">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Laya - High-Fidelity Music</title>
+  
+  <link rel="icon" type="image/png" href="assets/icon.png">
+  <link rel="apple-touch-icon" href="assets/icon.png">
+  <link rel="stylesheet" href="css/mobile.css">
+</head>
+<body>
+  <!-- Dynamic Ambient Mesh Canvas (GPU-accelerated background adapting to album colors) -->
+  <div id="mobile-ambient-canvas">
+    <div class="mesh-orb orb-1"></div>
+    <div class="mesh-orb orb-2"></div>
+    <div class="mesh-orb orb-3"></div>
+  </div>
+
+  <div id="mobile-app">
+    <!-- Frosted Top Header Bar -->
+    <header id="mobile-top-bar">
+      <div class="brand-wrapper">
+        <img class="brand-logo" src="assets/icon.png" alt="Laya"/>
+        <span class="brand-title">Laya</span>
+      </div>
+
+      <div class="top-bar-actions">
+        <button id="btn-top-switch-tv" class="icon-btn" title="View TV Web App" onclick="window.location.href='index.html?mode=tv'">
+          <svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Views Viewport -->
+    <main id="mobile-viewport">
+      <!-- 1. Home Screen -->
+      <section id="view-home" class="mobile-view active">
+        <h1 id="home-greeting-text" class="view-title-large">Good evening</h1>
+        <p class="view-subtitle">Music picked for your vibe today</p>
+
+        <!-- Quick search launcher pill -->
+        <div id="home-quick-search" class="home-quick-search-pill">
+          <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; fill: currentColor;"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 14z"/></svg>
+          <span>Search songs, artists, or albums...</span>
+        </div>
+
+        <!-- Quick Play Grid (Favorites & History) -->
+        <div id="home-quick-grid" class="grid-2col"></div>
+
+        <!-- Dynamic Shelves Injected Here -->
+        <div id="home-shelves-container"></div>
+      </section>
+
+      <!-- 2. Search Screen -->
+      <section id="view-search" class="mobile-view">
+        <h1 class="view-title-large">Search</h1>
+        <p class="view-subtitle">Explore 100M+ high-fidelity tracks & artists</p>
+
+        <div class="search-input-wrapper">
+          <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 14z"/></svg>
+          <input type="text" id="mobile-search-input" placeholder="What do you want to listen to?" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+          <button id="btn-clear-search">✕</button>
+        </div>
+
+        <!-- Quick Browse Chips -->
+        <div id="search-browse-section">
+          <div style="font-size: 13px; font-weight: 800; color: var(--text-dim); text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.8px;">Browse Categories</div>
+          <div class="genre-chips-container">
+            <div class="genre-chip" data-query="Arijit Singh">🎤 Arijit Singh</div>
+            <div class="genre-chip" data-query="Diljit Dosanjh">🔥 Diljit Dosanjh</div>
+            <div class="genre-chip" data-query="Bollywood Romantic">❤️ Bollywood Romance</div>
+            <div class="genre-chip" data-query="Shreya Ghoshal">✨ Shreya Ghoshal</div>
+            <div class="genre-chip" data-query="Punjabi Hits">⚡ Punjabi Hits</div>
+            <div class="genre-chip" data-query="Lo-Fi Chill">🌙 Lo-Fi & Chill</div>
+            <div class="genre-chip" data-query="The Weeknd">🌌 The Weeknd</div>
+          </div>
+        </div>
+
+        <!-- Dynamic Results Container (Artist Spotlight + Track Rows) -->
+        <div id="search-results-list"></div>
+      </section>
+
+      <!-- 3. Library Screen -->
+      <section id="view-library" class="mobile-view">
+        <h1 class="view-title-large">Your Library</h1>
+        <p class="view-subtitle">Saved music and imported playlists</p>
+
+        <!-- Liked Songs Hero Card -->
+        <div id="lib-liked-card" class="library-card-hero">
+          <div class="hero-heart-badge">❤️</div>
+          <div class="library-card-info">
+            <div class="library-card-title">Liked Songs</div>
+            <div id="lib-liked-count" class="library-card-sub">0 songs</div>
+          </div>
+        </div>
+
+        <!-- Import Playlist Promo Card -->
+        <div id="lib-import-card" class="import-promo-card">
+          <div class="import-icon-badge">📲</div>
+          <div class="library-card-info">
+            <div style="font-size: 15px; font-weight: 800; color: #fff;">Import Playlist</div>
+            <div style="font-size: 12px; color: var(--text-sub); margin-top: 2px;">Sync playlists from Spotify, Apple Music & JioSaavn</div>
+          </div>
+        </div>
+
+        <div class="section-header">
+          <div class="section-title">Playlists</div>
+        </div>
+        <div id="lib-playlists-list"></div>
+      </section>
+
+      <!-- 4. Dedicated Playlist & Artist Discography View -->
+      <section id="view-playlist" class="mobile-view">
+        <!-- Rendered dynamically by MobileApp.renderPlaylistView -->
+      </section>
+    </main>
+
+    <!-- Persistent Floating Frosted Mini-Player -->
+    <div id="mobile-mini-player" class="hidden">
+      <div id="mini-progress-fill" class="mini-progress-bar"></div>
+      <div class="mini-art">
+        <img id="mini-art-img" src="assets/icon.png" alt=""/>
+      </div>
+      <div class="mini-info">
+        <div id="mini-title" class="mini-title">Not Playing</div>
+        <div id="mini-artist" class="mini-artist">Select a song</div>
+      </div>
+      <div class="mini-controls">
+        <button id="mini-btn-play" class="mini-btn" title="Play / Pause">
+          <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+        <button id="mini-btn-next" class="mini-btn" title="Next Song">
+          <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Bottom Navigation Bar -->
+    <nav id="mobile-bottom-nav">
+      <div class="nav-tab-item active" data-view="home">
+        <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+        <span>Home</span>
+      </div>
+      <div class="nav-tab-item" data-view="search">
+        <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 14z"/></svg>
+        <span>Search</span>
+      </div>
+      <div class="nav-tab-item" data-view="library">
+        <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+        <span>Library</span>
+      </div>
+    </nav>
+  </div>
+
+  <!-- Fullscreen Player Bottom Sheet (Apple Music / iOS Grade Glass) -->
+  <div id="mobile-fullscreen-player">
+    <div class="player-sheet-header">
+      <div class="sheet-drag-handle"></div>
+      <button id="btn-collapse-player" class="btn-collapse-player">
+        <svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+      </button>
+      <div class="player-header-title">Now Playing</div>
+      <div style="width: 40px;"></div>
+    </div>
+
+    <!-- Album Art with Dynamic Ambient Bleed Glow -->
+    <div class="player-artwork-container">
+      <div id="player-artwork-card" class="player-artwork-card">
+        <img id="player-art-img" src="assets/icon.png" alt=""/>
+      </div>
+    </div>
+
+    <!-- Track Metadata & Like Action -->
+    <div class="player-meta-row">
+      <div class="player-meta-info">
+        <div id="player-title" class="player-title">Track Title</div>
+        <div id="player-artist" class="player-artist">Artist Name</div>
+      </div>
+      <button id="player-btn-fav" class="btn-player-favorite" title="Like song">🤍</button>
+    </div>
+
+    <!-- Scrubber Seek Bar -->
+    <div class="player-progress-container">
+      <div id="player-scrubber" class="player-scrubber-track">
+        <div id="player-scrubber-fill" class="player-scrubber-fill">
+          <div class="player-scrubber-thumb"></div>
+        </div>
+      </div>
+      <div class="player-time-row">
+        <span id="player-time-cur">0:00</span>
+        <span id="player-time-rem">-0:00</span>
+      </div>
+    </div>
+
+    <!-- Main Playback Controls -->
+    <div class="player-controls-row">
+      <button id="player-btn-shuffle" class="ctrl-btn" title="Shuffle">
+        <svg viewBox="0 0 24 24"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+      </button>
+      <button id="player-btn-prev" class="ctrl-btn" title="Previous">
+        <svg viewBox="0 0 24 24" style="width: 28px; height: 28px;"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+      </button>
+      <button id="player-btn-play" class="ctrl-btn ctrl-btn-play-pause" title="Play / Pause">
+        <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+      </button>
+      <button id="player-btn-next" class="ctrl-btn" title="Next">
+        <svg viewBox="0 0 24 24" style="width: 28px; height: 28px;"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+      </button>
+      <button id="player-btn-repeat" class="ctrl-btn" title="Repeat">
+        <svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
+      </button>
+    </div>
+
+    <!-- Bottom Action Toggles: Synced Lyrics & Queue -->
+    <div class="player-bottom-actions">
+      <button id="btn-toggle-lyrics" class="pill-toggle-btn">
+        <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; fill: currentColor;"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM9 11H7V9h2v2zm4 0h-2V9h2v2zm4 0h-2V9h2v2z"/></svg>
+        <span>Lyrics</span>
+      </button>
+      <button id="btn-toggle-queue" class="pill-toggle-btn">
+        <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; fill: currentColor;"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
+        <span>Up Next</span>
+      </button>
+    </div>
+
+    <!-- Synchronized Lyrics Overlay Panel -->
+    <div id="mobile-lyrics-panel"></div>
+  </div>
+
+  <!-- Up Next Queue Modal -->
+  <div id="mobile-queue-modal" class="modal-overlay">
+    <div class="modal-glass-card">
+      <div class="modal-header-row">
+        <div class="modal-title">Up Next Queue</div>
+        <button id="btn-close-queue-modal" class="icon-btn" style="width: 30px; height: 30px;">✕</button>
+      </div>
+      <div id="queue-tracks-list" style="max-height: 55vh; overflow-y: auto;"></div>
+    </div>
+  </div>
+
+  <!-- Import Playlist Modal -->
+  <div id="modal-importer" class="modal-overlay">
+    <div class="modal-glass-card">
+      <div class="modal-header-row">
+        <div class="modal-title">Import Playlist</div>
+        <button id="btn-close-importer" class="icon-btn" style="width: 30px; height: 30px;">✕</button>
+      </div>
+      <p style="font-size: 13px; color: var(--text-sub); margin-bottom: 14px;">
+        Paste a public playlist link from Spotify, Apple Music, or JioSaavn:
+      </p>
+      <input type="url" id="import-url-input" class="modal-input" placeholder="https://open.spotify.com/playlist/..."/>
+      <button id="btn-submit-import" class="btn-modal-primary">Import Playlist</button>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="mobile-toast"></div>
+
+  <!-- Core Shared Services (No TV bloat) -->
+  <script src="js/lib/crypto-js.min.js"></script>
+  <script src="js/player/queue.js"></script>
+  <script src="js/player/audio-controller.js"></script>
+  <script src="js/providers/lyrics-service.js"></script>
+  <script src="js/providers/innertube.js"></script>
+  <script src="js/providers/playlist-importer.js"></script>
+  <script src="js/ui/library.js"></script>
+  <script src="js/ui/palette-extractor.js"></script>
+  
+  <!-- Mobile Specific Controller -->
+  <script src="js/mobile/mobile-app.js"></script>
+</body>
+</html>

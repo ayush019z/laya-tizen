@@ -1,17 +1,19 @@
 {
-  "version": "1.4.5",
-  "build": 194,
-  "releaseDate": "2026-11-22",
+  "version": "1.5.0",
+  "build": 195,
+  "releaseDate": "2026-11-28",
   "minTizenVersion": "3.0",
   "updateUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/version.json",
   "bundleBaseUrl": "https://raw.githubusercontent.com/ayush019z/laya-tizen/main/",
-  "changelog": "Artist Discography & Total Musics search support (e.g. search Arijit Singh to open and play complete 50-70+ hit catalog, official discography banner, verified artist spotlight, and seamless remote D-pad playback).",
+  "changelog": "Added Laya Mobile Edition: Ultra-premium frosted glass touch UI with dynamic ambient mesh gradients, iOS-style bottom sheet player, live synced lyrics, verified artist spotlights, and Spotify/Apple Music import without TV-only features.",
   "files": [
     "index.html",
+    "mobile.html",
     "mic.html",
     "import.html",
     "party.html",
     "css/app.css",
+    "css/mobile.css",
     "js/lib/crypto-js.min.js",
     "js/providers/remote-bridge.js",
     "js/navigation/remote-keys.js",
@@ -26,6 +28,7 @@
     "js/ui/palette-extractor.js",
     "js/ui/qr-generator.js",
     "js/ui/views.js",
+    "js/mobile/mobile-app.js",
     "version.json"
   ]
 }
